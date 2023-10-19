@@ -1,8 +1,2 @@
-# notebook-sharing-service
-Generic service for sharing Jupyter notebooks between users. 
-
-### Goal
-
-- Use an extensible storage backend and auth store
-- Define a generic collaborator model
-
+# Jupyter Notebook Publishing Service
+A (backend agnostic) service for publishing sharable Jupyter content
