@@ -1,29 +1,34 @@
 from abc import ABC, abstractmethod
-from jupyter_publishing_service.models import UserOrGroup
+from jupyter_publishing_service.models import Collaborator, SharedFile, CollaboratorRole, Role
+
+
 class CollaboratorStore(ABC):
 
     @abstractmethod
-    def add(self, user: UserOrGroup, file: SharedFile, permissions: list[str]) -> bool:
+    async def add(self, user: Collaborator, file: SharedFile, roles: list[Role]):
         """
-        Add the user as a collaborator on the given file with given permissions
+        Add the user as a collaborator on the given file with given roles
         """
         ...
 
-
     @abstractmethod
-    def delete(self, user: UserOrGroup, file: SharedFile) -> bool:
+    async def delete(self, user: Collaborator, file: SharedFile):
         """
         Remove the user as a collaborator on the give file
         """
         ...
 
-
     @abstractmethod
-    def update(self, user: UserOrGroup, file: SharedFile, permissions: list[str]) -> bool:
+    async def update(self, user: Collaborator, file: SharedFile, roles: list[Role]):
         """
         Update user's permissions on the given file
         User must be a collaborotor on the file
         """
         ...
 
-
+    @abstractmethod
+    async def get(self, file: SharedFile) -> list[CollaboratorRole]:
+        """
+        Get collaborators on a given file with their permissions
+        """
+        ...

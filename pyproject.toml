@@ -28,7 +28,9 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pydantic",
-    "traitlets"
+    "traitlets",
+    "sqlmodel",
+    "aiosqlite"
 ]
 
 [project.optional-dependencies]

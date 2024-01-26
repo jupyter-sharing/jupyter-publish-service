@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class Authorizer(ABC):
     @abstractmethod
     def authorize(self, user, data) -> dict:
