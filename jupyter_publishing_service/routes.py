@@ -40,7 +40,7 @@ async def get_collaborators(file_id: str):
 
 
 @router.post("/sharing", response_model=SharedFile)
-async def add_file(body=CreateSharedFile) -> SharedFile:
+async def add_file(body: CreateSharedFile) -> SharedFile:
     app = router.app
     store = app.collaborator_store
     collaborators = body.collaborators
@@ -53,5 +53,7 @@ async def add_file(body=CreateSharedFile) -> SharedFile:
         version=1,
         shareable_link="http://127.0.0.1:9000/" + f"{body.id}",
     )
-    await store.add(collaborators=collaborators, file=shared_file, roles=roles)
-    # Save to content manager store
+    for collaborator in collaborators:
+        await store.add(collaborator=collaborator, file=shared_file, roles=roles)
+    return shared_file
+    # Save to content store

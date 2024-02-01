@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 from sqlalchemy import UniqueConstraint
@@ -24,7 +24,7 @@ class Role(SQLModel, table=True):
     )
 
     def permission_names(self):
-        return [permission.id for permission in self.permissions]
+        return [permission.name for permission in self.permissions]
 
 
 class Permission(SQLModel, table=True):
@@ -41,14 +41,14 @@ class CollaboratorRole(SQLModel, table=True):
 
 
 class SharedFile(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: Optional[uuid.UUID] = Field(default=None, primary_key=True)
     name: str
     author: str
     title: str
     created: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     last_modified: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     version: int
-    sharable_link: str
+    shareable_link: str
 
 
 class JupyterContentsModel(BaseModel):
@@ -58,18 +58,18 @@ class JupyterContentsModel(BaseModel):
     writable: str
     created: datetime
     last_modified: datetime
-    mimetype: Optional[str]
-    content: Optional[dict]
-    format: Optional[str]
+    mimetype: Optional[str] = None
+    content: Optional[dict] = None
+    format: Optional[str] = None
 
 
 class CreateSharedFile(BaseModel):
-    id: str
+    id: uuid.UUID
     author: str
     name: str
     title: str
-    collaborators: list[Collaborator]
-    notebook_server: Optional[str]
+    collaborators: List[Collaborator]
+    notebook_server: Optional[str] = None
     # contents: JupyterContentsModel
-    managed_by: Optional[str]
-    roles: list[Role]
+    managed_by: Optional[str] = None
+    roles: List[Role]

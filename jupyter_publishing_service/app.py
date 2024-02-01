@@ -36,7 +36,7 @@ class JupyterPublishingService(JupyterApp):
     #
     collaborator_store_class = Type(
         default_value=SQLCollaboratorProvider,
-        klass="jupyter_publishing_service.collaborator.client.SQLCollaboratorProvider",
+        klass="jupyter_publishing_service.collaborator.abc.CollaboratorStore",
     ).tag(config=True)
 
     # file_manager_class = Type(
@@ -96,7 +96,7 @@ class JupyterPublishingService(JupyterApp):
     def init_webapp(self):
         self.app = FastAPI(
             title="Jupyter Publishing Server",
-            description="Jupyter File Publishing Server implementation powered by FastAPI."
+            description="Jupyter File Publishing Server implementation powered by FastAPI.",
         )
         self.app.include_router(router)
         router.app = self
