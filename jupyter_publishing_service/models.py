@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -51,16 +51,23 @@ class SharedFile(SQLModel, table=True):
     shareable_link: str
 
 
-class JupyterContentsModel(BaseModel):
+class JupyterContentsModel(SQLModel, table=True):
+    id: Optional[uuid.UUID] = Field(default=None, foreign_key="sharedfile.id", primary_key=True)
     name: str
     path: str
     type: str
-    writable: str
-    created: datetime
-    last_modified: datetime
+    writable: bool
+    created: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    last_modified: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     mimetype: Optional[str] = None
-    content: Optional[dict] = None
+    content: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     format: Optional[str] = None
+
+
+class SharedFileWithCollaborators(BaseModel):
+    file: SharedFile
+    collaborators: List[CollaboratorRole]
+    content: Optional[dict]
 
 
 class CreateSharedFile(BaseModel):
@@ -70,6 +77,16 @@ class CreateSharedFile(BaseModel):
     title: str
     collaborators: List[Collaborator]
     notebook_server: Optional[str] = None
-    # contents: JupyterContentsModel
+    contents: JupyterContentsModel
     managed_by: Optional[str] = None
     roles: List[Role]
+
+
+class PatchSharedFile(BaseModel):
+    id: uuid.UUID
+    name: Optional[str] = None
+    title: Optional[str] = None
+    collaborators: Optional[List[Collaborator]] = None
+    contents: Optional[JupyterContentsModel] = None
+    managed_by: Optional[str] = None
+    roles: Optional[List[Role]] = None

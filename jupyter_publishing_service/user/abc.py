@@ -1,29 +1,40 @@
 from abc import ABC, abstractmethod
-from jupyter_publishing_service.models import UserOrGroup
+from typing import List
 
-class UserStore(ABC):
+from jupyter_publishing_service.models import Collaborator
+
+
+class UserStoreABC(ABC):
     @abstractmethod
-    def search_users(self, search_string: str) -> List[UserOrGroup]:
+    def search_users(self, search_string: str) -> List[Collaborator]:
         """
-        Search for user name
+        Search for users
 
         This must be non-blocking co-routine
 
-        Must return username on successful authentication,
-        and return None on failed authentication
+        Must return list of users
 
         Args:
-            search_string (dict): Login data
+            search_string (dict): partial name or email address
 
         Returns:
-            users (List[UserOrGroup]): Must return a list of users
+            users (List[Collaborator]): Must return a list of users
         """
-        ...
-
+        return NotImplemented
 
     @abstractmethod
-    def search_groups(self, search_string: str) -> List[UserOrGroup]:
+    def search_groups(self, search_string: str) -> List[Collaborator]:
         """
-        Search for groups from user store
+        Search for groups
+
+        This must be non-blocking co-routine
+
+        Must return list of groups
+
+        Args:
+            search_string (dict): partial name or email address
+
+        Returns:
         """
-        ...
+
+        return NotImplemented

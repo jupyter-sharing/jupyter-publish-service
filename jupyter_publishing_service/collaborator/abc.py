@@ -1,3 +1,4 @@
+import uuid
 from abc import ABCMeta, abstractmethod
 from typing import List
 
@@ -6,6 +7,7 @@ from jupyter_publishing_service.models import (
     CollaboratorRole,
     Role,
     SharedFile,
+    SharedFileWithCollaborators,
 )
 
 
@@ -33,7 +35,7 @@ class CollaboratorStore(metaclass=ABCMeta):
         return NotImplemented
 
     @abstractmethod
-    async def get(self, file: SharedFile) -> list[CollaboratorRole]:
+    async def get(self, file: uuid.UUID) -> SharedFileWithCollaborators:
         """
         Get collaborators on a given file with their permissions
         """

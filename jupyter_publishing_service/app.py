@@ -7,46 +7,39 @@ from jupyter_core.application import JupyterApp
 from jupyter_core.paths import jupyter_data_dir
 from traitlets import Integer, Type, Unicode, default, validate
 
-from .collaborator.abc import CollaboratorStore
-from .collaborator.client import SQLCollaboratorProvider
-from .routes import router
-from .session.manager import SessionManager
+from jupyter_publishing_service.authenticator.jwt_authenticator import JWTAuthenticator
+from jupyter_publishing_service.authenticator.service import set_authenticator_class
+from jupyter_publishing_service.authorizer.rbac_authorizer import RBACAuthorizer
+from jupyter_publishing_service.authorizer.service import set_authorizer_class
+from jupyter_publishing_service.collaborator.sql_collaborator import (
+    SQLCollaboratorProvider,
+)
+from jupyter_publishing_service.file.sql_manager import SQLManager
+from jupyter_publishing_service.routes import router
 
 DEFAULT_SHARING_FOLDER = os.path.join(jupyter_data_dir(), "publishing")
 DEFAULT_JUPYTER_PUBLISHING_PORT = 9000
 
 
 class JupyterPublishingService(JupyterApp):
-    # Add an authenticator interface
-    # authenticator_class = Type(
-    #     default_value=DummyAuthenticator,
-    #     kclass="jupyter_publishing_service.auth.authenticator.Authenticator",
-    # ).tag(config=True)
-    #
-    # # Add an authorizer interface
-    # authorizer_class = Type(
-    #     default_value=DummyAuthorizer,
-    #     kclass="jupyter_publishing_service.auth.authorizer.Authorizer",
-    # ).tag(config=True)
-    #
-    # user_store_class = Type(
-    #     default_value=IDMSCollaboratorProvider,
-    #     klass="jupyter_publishing_service.collaborators.abc.CollaboratorProviderABC",
-    # ).tag(config=True)
-    #
+    authenticator_class = Type(
+        default_value=JWTAuthenticator,
+        kclass="jupyter_publishing_service.authenticator.AuthenticatorABC",
+    ).tag(config=True)
+
+    authorizer_class = Type(
+        default_value=RBACAuthorizer,
+        kclass="jupyter_publishing_service.authorizer.AuthorizerABC",
+    ).tag(config=True)
+
     collaborator_store_class = Type(
         default_value=SQLCollaboratorProvider,
         klass="jupyter_publishing_service.collaborator.abc.CollaboratorStore",
     ).tag(config=True)
 
-    # file_manager_class = Type(
-    #     default_value=LargeFileManager,
-    #     klass="jupyter_server.services.contents.manager.ContentsManager",
-    # ).tag(config=True)
-
-    session_manager_class = Type(
-        default_value=SessionManager,
-        klass="jupyter_publishing_service.session.manager.SessionManager",
+    file_manager_class = Type(
+        default_value=SQLManager,
+        klass="jupyter_server.services.contents.manager.ContentsManager",
     ).tag(config=True)
 
     root_dir = Unicode(default_value=DEFAULT_SHARING_FOLDER).tag(config=True)
@@ -62,6 +55,16 @@ class JupyterPublishingService(JupyterApp):
         config=True,
         help="The IP address the Jupyter server will listen on.",
     )
+
+    # database_filepath = UnicodeFromEnv(
+    #     name=constants.DATABASE_FILE,
+    #     default_value="database.db",
+    #     help=(
+    #         "The filesystem path to SQLite Database file "
+    #         "(e.g. /path/to/session_database.db). By default, the session "
+    #         "database is stored on local filesystem disk"
+    #     ),
+    # ).tag(config=True)
 
     @default("ip")
     def _default_ip(self):
@@ -86,12 +89,12 @@ class JupyterPublishingService(JupyterApp):
         return value
 
     def init_configurables(self):
-        # self.authenticator = self.authenticator_class(paret=self, log=self.log)
-        # self.authorizer = self.authorizer_class(parent=self, log=self.log)
-        # self.file_manager = self.file_manager_class(parent=self, log=self.log)
-        # self.user_store = self.user_store_class(parent=self, log=self.log)
-        self.session_manager = self.session_manager_class(parent=self, log=self.log)
+        self.file_manager = self.file_manager_class(parent=self, log=self.log)
         self.collaborator_store = self.collaborator_store_class(parent=self, log=self.log)
+        self.authenticator = self.authenticator_class(parent=self, log=self.log)
+        self.authorizer = self.authorizer_class(parent=self, log=self.log)
+        set_authenticator_class(self.authenticator)
+        set_authorizer_class(self.authorizer)
 
     def init_webapp(self):
         self.app = FastAPI(

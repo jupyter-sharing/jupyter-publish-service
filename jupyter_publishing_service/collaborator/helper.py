@@ -6,23 +6,6 @@ from sqlmodel import select
 
 from jupyter_publishing_service.models import Collaborator, CollaboratorRole, SharedFile
 
-# async def get_or_create_collaborator(session, model, defaults=None, **kwargs):
-#     instance = session.query(model).filter_by(**kwargs).one_or_none()
-#     if instance:
-#         return instance, False
-#     else:
-#         kwargs |= defaults or {}
-#         instance = model(**kwargs)
-#         try:
-#             session.add(instance)
-#             await session.commit()
-#         except Exception:
-#             await session.rollback()
-#             instance = session.query(model).filter_by(**kwargs).one()
-#             return instance, False
-#         else:
-#             return instance, True
-
 
 async def create_or_update_collaborator(session, collaborator: Collaborator):
     current_collaborator = await session.get(Collaborator, collaborator.email)
@@ -58,12 +41,12 @@ async def create_or_update_role(session, role: CollaboratorRole):
         .where(CollaboratorRole.role == role.role)
     )
     result = await session.exec(statement)
-    if result.first() is None:
-        result = role
+    current_role = result.first()
+    if current_role is None:
+        current_role = role
     for key, val in role.model_dump(exclude_unset=True).items():
-        setattr(result, key, val)
-    print(result)
-    session.add(result)
+        setattr(current_role, key, val)
+    session.add(current_role)
     await session.commit()
 
-    return result
+    return current_role

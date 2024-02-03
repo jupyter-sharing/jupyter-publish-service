@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 
 
-class Authorizer(ABC):
+class AuthorizerABC(ABC):
     @abstractmethod
-    def authorize(self, user, data) -> dict:
+    def authorize(self, user, data) -> bool:
         """
         Authorizer a user with given data
 
@@ -13,10 +13,10 @@ class Authorizer(ABC):
 
         Args:
             user (dict): user dict with key 'name'
-            data (dict): data dict that helps making authorization decision
-                        Will contain atleast 'path' and 'method'
+            data (dict): dict representation of the resource being considered.
+            Contains a key called permissions to indicate the required list of permissions
 
         Returns:
             boolean (True or False): Must return whether user is authorized to perform requested action on path
         """
-        ...
+        return NotImplemented

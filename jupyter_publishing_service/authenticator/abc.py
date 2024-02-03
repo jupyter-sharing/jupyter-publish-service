@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 
-class Authenticator(ABC):
-
+class AuthenticatorABC(metaclass=ABCMeta):
     @abstractmethod
-    def authenticate(self, data) -> dict:
+    async def authenticate(self, data) -> dict:
         """
         Authenticate a user with login data
 
@@ -19,4 +18,4 @@ class Authenticator(ABC):
         Returns:
             user (dict or None): Must return a dict with key 'name' with a unique value. Can include other fields
         """
-        ...
+        raise NotImplementedError

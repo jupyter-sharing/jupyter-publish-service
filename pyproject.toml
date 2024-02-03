@@ -24,13 +24,13 @@ classifiers = [
 requires-python = ">=3.7"
 dependencies = [
     "jupyter_core",
-    "jupyter_server",
     "fastapi",
     "uvicorn",
     "pydantic",
     "traitlets",
     "sqlmodel",
-    "aiosqlite"
+    "aiosqlite",
+    "jwcrypto"
 ]
 
 [project.optional-dependencies]
