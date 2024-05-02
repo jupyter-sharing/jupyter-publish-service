@@ -52,9 +52,9 @@ async def get_file(
     print(request.state.user)
     store = app.collaborator_store
     file_manager = app.file_manager
-    results = await store.get(file=file_id)
+    results = await store.get(file=str(file_id))
     if content:
-        c = await file_manager.get(path=file_id, content=True, type="notebook")
+        c = await file_manager.get(path=str(file_id), content=True, type="notebook")
         results.content = c
     return results
 
@@ -76,7 +76,7 @@ async def add_file(body: CreateSharedFile) -> SharedFile:
     )
     for collaborator in collaborators:
         await store.add(collaborator=collaborator, file=shared_file, roles=roles)
-    await file_manager.save(body.contents, body.id)
+    await file_manager.save(body.contents.model_dump(), str(body.id))
     return shared_file
 
 

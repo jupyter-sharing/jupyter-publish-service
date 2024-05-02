@@ -59,12 +59,13 @@ class SQLCollaboratorProvider(LoggingConfigurable):
                 )
                 await create_or_update_role(session, collab_role)
 
-    async def get(self, file: uuid.UUID) -> SharedFileWithCollaborators:
+    async def get(self, file: str) -> SharedFileWithCollaborators:
+        file_uuid = uuid.UUID(file)
         async with self._session() as session:
-            c_stmt = select(CollaboratorRole).where(CollaboratorRole.file == file)
+            c_stmt = select(CollaboratorRole).where(CollaboratorRole.file == file_uuid)
             results = await session.exec(c_stmt)
             collab_roles = results.all()
-            f_stmt = select(SharedFile).where(SharedFile.id == file)
+            f_stmt = select(SharedFile).where(SharedFile.id == file_uuid)
             results = await session.exec(f_stmt)
             shared_file = results.first()
             result = SharedFileWithCollaborators(

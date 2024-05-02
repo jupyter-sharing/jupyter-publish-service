@@ -1,3 +1,5 @@
+import uuid
+
 from jupyter_server.services.contents.filemanager import AsyncFileContentsManager
 from sqlmodel import select
 
@@ -35,17 +37,19 @@ class SQLManager(AsyncFileContentsManager):
         """
         if type != "notebook":
             return {}
+        path_uuid = uuid.UUID(path)
         async with self._session() as session:
-            stmt = select(JupyterContentsModel).where(JupyterContentsModel.id == path)
+            stmt = select(JupyterContentsModel).where(JupyterContentsModel.id == path_uuid)
             results = await session.exec(stmt)
             nb = results.first()
             return nb.model_dump(mode="json")
 
     async def save(self, model, path="") -> dict:
         """Save the file model and return the model with no content."""
+        path_uuid = uuid.UUID(path) if path is not None else None
         async with self._session() as session:
             jcm = JupyterContentsModel.model_validate(model)
-            jcm.id = path if path is not None else jcm.id
+            jcm.id = path_uuid if path_uuid is not None else jcm.id
             await create_or_update_jupyter_contents(session, jcm)
             jcm.content = None
             return jcm.model_dump(exclude_unset=True, mode="json")
