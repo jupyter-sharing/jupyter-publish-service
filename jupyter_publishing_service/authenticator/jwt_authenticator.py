@@ -20,7 +20,11 @@ class JWTAuthenticator(LoggingConfigurable):
         allow_none=False,
     ).tag(config=True)
 
-    ssl_cert_file = UnicodeFromEnv(name=constants.SSL_CERT_FILE, allow_none=True).tag(config=True)
+    ssl_cert_file = UnicodeFromEnv(
+        name=constants.SSL_CERT_FILE,
+        help="SSL CA Cert for trusting JWK_URI endpoint",
+        allow_none=True,
+    ).tag(config=True)
 
     public_keys = Dict(
         help="Public keys for decoding the JWT tokens in each request. "

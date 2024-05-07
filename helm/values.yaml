@@ -1,0 +1,26 @@
+jupyterPublishService:
+  port: 9001
+  # Additional container environment variable in raw YAML format
+  # Uncomment or add additional environment variables for the container here.
+  replicaCount: 1
+  appName: jupyter-publish-service
+  image: placeholder
+  namespace: jupyter
+  resources:
+    limits:
+      cpu: 4
+      memory: 4Gi
+    requests:
+      cpu: 2
+      memory: 4Gi
+  # Additional volumes in raw YAML format
+  # Uncomment or add volumes for the container here.
+  createServiceAccount: true
+  serviceAccountName: jupyter
+  probeInitialDelaySeconds: 30
+  shutdownDelaySeconds: 10
+  terminationGracePeriodSeconds: 30 # includes shutdownDelaySeconds
+  fileManagerClass: "jupyter_publishing_service.file.sql_manager.SQLManager"
+  logLevel: "INFO"
+  jwkUri: "placeholder"
+  emailClaim: "email"

@@ -13,6 +13,7 @@ repos:
       - id: check-case-conflict
       - id: check-toml
       - id: check-yaml
+        exclude: ^helm/
       - id: debug-statements
       - id: forbid-new-submodules
       - id: check-builtin-literals

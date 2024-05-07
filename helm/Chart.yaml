@@ -1,0 +1,8 @@
+apiVersion: v2
+name: jupyter-publish-service
+description: Jupyter Notebook Publishing APIs
+type: application
+version: 0.1.0
+maintainers:
+  - name: Shravan Achar
+    email: shravan.achar@apple.com

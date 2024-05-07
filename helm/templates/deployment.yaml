@@ -1,0 +1,68 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.jupyterPublishService.appName }}
+  name: {{ .Values.jupyterPublishService.appName }}
+  namespace: {{ .Values.jupyterPublishService.namespace }}
+spec:
+  replicas: {{ .Values.jupyterPublishService.replicaCount }}
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.jupyterPublishService.appName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.jupyterPublishService.sdrAppName }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.jupyterPublishService.terminationGracePeriodSeconds }}
+      containers:
+        - name: {{ .Values.jupyterPublishService.appName }}
+          image: {{ .Values.jupyterPublishService.image }}
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep {{ .Values.jupyterPublishService.shutdownDelaySeconds }}"]
+          command:
+            - /bin/bash
+            - -c
+            - './scripts/start.sh'
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.jupyterPublishService.logLevel | quote }}
+            - name: JWKS_URI
+              value: {{ .Values.jupyterPublishService.jwkUri | quote }}
+            - name: EMAIL_CLAIM_STRING
+              value: {{ .Values.jupyterPublishService.emailClaim | quote }}
+            - name: FILE_MANAGER_CLASSPATH
+              value: {{ .Values.jupyterPublishService.fileManagerClass | quote }}
+            - name: K8S_INSTANCE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          ports:
+            - containerPort: {{ .Values.jupyterPublishService.port }}
+              name: web
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.jupyterPublishService.healthEndpoint }}
+              port: {{ .Values.jupyterPublishService.port }}
+            initialDelaySeconds: {{ .Values.jupyterPublishService.probeInitialDelaySeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.jupyterPublishService.healthEndpoint }}
+              port: {{ .Values.jupyterPublishService.port }}
+            initialDelaySeconds: {{ .Values.jupyterPublishService.probeInitialDelaySeconds }}
+          resources:
+            limits:
+              cpu: {{ .Values.jupyterPublishService.resources.limits.cpu }}
+              memory: {{ .Values.jupyterPublishService.resources.limits.memory }}
+            requests:
+              cpu: {{ .Values.jupyterPublishService.resources.requests.cpu }}
+              memory: {{ .Values.jupyterPublishService.resources.requests.memory }}
+      serviceAccountName: {{ .Values.jupyterPublishService.serviceAccountName | quote }}

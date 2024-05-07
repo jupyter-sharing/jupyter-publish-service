@@ -14,8 +14,6 @@ SQL based file metadata store
 SQL based file content store
 
 TODO:
-Remove IAS authorize endpoint
-Helm chart to deploy locally
 RTC changes
 Unit testing framework
 

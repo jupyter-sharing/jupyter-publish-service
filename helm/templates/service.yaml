@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.jupyterPublishService.appName }}
+  namespace: {{ .Values.jupyterPublishService.namespace }}
+spec:
+  ports:
+    - name: web
+      port: {{ .Values.jupyterPublishService.port }}
+      protocol: TCP
+      targetPort: web
+  selector:
+    app: {{ .Values.jupyterPublishService.appName | quote }}
+  type: ClusterIP
