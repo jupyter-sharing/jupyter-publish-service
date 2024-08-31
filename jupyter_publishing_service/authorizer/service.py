@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer
 from starlette.exceptions import HTTPException
 
 from jupyter_publishing_service.authorizer.abc import AuthorizerABC
-from jupyter_publishing_service.models import Permission
+from jupyter_publishing_service.models.sql import Permission
 
 httpBearer = HTTPBearer()
 

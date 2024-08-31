@@ -12,7 +12,9 @@ from jupyter_publishing_service.traits import UnicodeFromEnv
 
 
 class JWTAuthenticator(LoggingConfigurable):
+
     _alg = "RS256"
+
     public_key_url = UnicodeFromEnv(
         name=constants.JWKS_URI,
         help="JWK URI of keys used for signing the JWT e.g https://www.googleapis.com/oauth2/v3/certs",
@@ -34,7 +36,7 @@ class JWTAuthenticator(LoggingConfigurable):
     ).tag(config=True)
 
     async def fetch_public_keys(self):
-        context = create_ssl_context(verify=self.ssl_cert_file)
+        context = False  # create_ssl_context(verify=self.ssl_cert_file)
         return await AsyncClient(verify=context).get(self.public_key_url)
 
     async def get_public_key_by_kid(self, token: str) -> JWK:

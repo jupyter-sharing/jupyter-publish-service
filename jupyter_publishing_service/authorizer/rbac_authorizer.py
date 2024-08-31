@@ -5,15 +5,16 @@ from traitlets.config import LoggingConfigurable
 from jupyter_publishing_service import constants
 from jupyter_publishing_service.authorizer.abc import AuthorizerABC
 from jupyter_publishing_service.database.manager import get_session
-from jupyter_publishing_service.models import CollaboratorRole, PermissionRoleLink
+from jupyter_publishing_service.models.sql import CollaboratorRole, PermissionRoleLink
 from jupyter_publishing_service.traits import UnicodeFromEnv
 
 
 class RBACAuthorizer(LoggingConfigurable):
+
     email_claim = UnicodeFromEnv(
-        name=constants.EMAIL_CLAIM_STRING,
+        name=constants.EMAIL_CLAIM_KEY,
         help="key denoting email claim in the JWT. Email address is assumed to be unique",
-        default="email",
+        default_value="email",
         allow_none=True,
     ).tag(config=True)
 

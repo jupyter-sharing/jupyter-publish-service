@@ -5,13 +5,13 @@ from sqlalchemy import select
 from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service.database.manager import get_session
-from jupyter_publishing_service.models import Collaborator
+from jupyter_publishing_service.models.sql import Collaborator
 from jupyter_publishing_service.user.abc import UserStoreABC
 
 cache = cachetools.TTLCache(maxsize=256, ttl=120)
 
 
-class SQLStore(LoggingConfigurable):
+class SQLUserStore(LoggingConfigurable):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._session = get_session
@@ -33,4 +33,4 @@ class SQLStore(LoggingConfigurable):
         return await self.search_users(search_string)
 
 
-UserStoreABC.register(SQLStore)
+UserStoreABC.register(SQLUserStore)

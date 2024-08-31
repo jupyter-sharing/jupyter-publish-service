@@ -30,7 +30,8 @@ dependencies = [
     "traitlets",
     "sqlmodel",
     "aiosqlite",
-    "jwcrypto"
+    "jwcrypto",
+    "httpx"
 ]
 
 [project.optional-dependencies]

@@ -5,41 +5,48 @@ import uvicorn
 from fastapi import FastAPI
 from jupyter_core.application import JupyterApp
 from jupyter_core.paths import jupyter_data_dir
-from traitlets import Integer, Type, Unicode, default, validate
+from traitlets import Instance, Integer, Type, Unicode, default, validate
 
-from jupyter_publishing_service.authenticator.jwt_authenticator import JWTAuthenticator
-from jupyter_publishing_service.authenticator.service import set_authenticator_class
-from jupyter_publishing_service.authorizer.rbac_authorizer import RBACAuthorizer
-from jupyter_publishing_service.authorizer.service import set_authorizer_class
-from jupyter_publishing_service.collaborator.sql_collaborator import (
-    SQLCollaboratorProvider,
+from jupyter_publishing_service.authenticator.jwt_authenticator import (
+    AuthenticatorABC,
+    JWTAuthenticator,
 )
-from jupyter_publishing_service.file.sql_manager import SQLManager
+from jupyter_publishing_service.authenticator.service import set_authenticator_class
+from jupyter_publishing_service.authorizer.rbac_authorizer import (
+    AuthorizerABC,
+    RBACAuthorizer,
+)
+from jupyter_publishing_service.authorizer.service import set_authorizer_class
 from jupyter_publishing_service.routes import router
+from jupyter_publishing_service.storagemanager import (
+    BaseStorageManager,
+    SQLStorageManager,
+)
 
 DEFAULT_SHARING_FOLDER = os.path.join(jupyter_data_dir(), "publishing")
 DEFAULT_JUPYTER_PUBLISHING_PORT = 9000
 
 
 class JupyterPublishingService(JupyterApp):
+
+    name = "publishing"
+    description = (
+        "A Jupyter service for publishing notebooks and sharing them with Jupyter servers."
+    )
+
     authenticator_class = Type(
         default_value=JWTAuthenticator,
-        kclass="jupyter_publishing_service.authenticator.AuthenticatorABC",
+        kclass="jupyter_publishing_service.authenticator.abc.AuthenticatorABC",
     ).tag(config=True)
 
     authorizer_class = Type(
         default_value=RBACAuthorizer,
-        kclass="jupyter_publishing_service.authorizer.AuthorizerABC",
+        kclass="jupyter_publishing_service.authorizer.abc.AuthorizerABC",
     ).tag(config=True)
 
-    collaborator_store_class = Type(
-        default_value=SQLCollaboratorProvider,
-        klass="jupyter_publishing_service.collaborator.abc.CollaboratorStore",
-    ).tag(config=True)
-
-    file_manager_class = Type(
-        default_value=SQLManager,
-        klass="jupyter_server.services.contents.manager.ContentsManager",
+    storage_manager_class = Type(
+        default_value=SQLStorageManager,
+        kclass="jupyter_publishing_service.storagemanager.BaseStorageManager",
     ).tag(config=True)
 
     root_dir = Unicode(default_value=DEFAULT_SHARING_FOLDER).tag(config=True)
@@ -55,16 +62,6 @@ class JupyterPublishingService(JupyterApp):
         config=True,
         help="The IP address the Jupyter server will listen on.",
     )
-
-    # database_filepath = UnicodeFromEnv(
-    #     name=constants.DATABASE_FILE,
-    #     default_value="database.db",
-    #     help=(
-    #         "The filesystem path to SQLite Database file "
-    #         "(e.g. /path/to/session_database.db). By default, the session "
-    #         "database is stored on local filesystem disk"
-    #     ),
-    # ).tag(config=True)
 
     @default("ip")
     def _default_ip(self):
@@ -88,13 +85,25 @@ class JupyterPublishingService(JupyterApp):
             value = ""
         return value
 
+    authenticator: AuthorizerABC = Instance(
+        klass="jupyter_publishing_service.authenticator.abc.AuthenticatorABC", allow_none=True
+    )
+
+    authorizer: AuthorizerABC = Instance(
+        klass="jupyter_publishing_service.authorizer.abc.AuthorizerABC", allow_none=True
+    )
+
+    storage_manager: BaseStorageManager = Instance(
+        klass="jupyter_publishing_service.storagemanager.BaseStorageManager", allow_none=True
+    )
+
     def init_configurables(self):
-        self.file_manager = self.file_manager_class(parent=self, log=self.log)
-        self.collaborator_store = self.collaborator_store_class(parent=self, log=self.log)
         self.authenticator = self.authenticator_class(parent=self, log=self.log)
         self.authorizer = self.authorizer_class(parent=self, log=self.log)
         set_authenticator_class(self.authenticator)
         set_authorizer_class(self.authorizer)
+        self.storage_manager = self.storage_manager_class(parent=self, log=self.log)
+        self.storage_manager.initialize()
 
     def init_webapp(self):
         self.app = FastAPI(

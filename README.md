@@ -7,15 +7,16 @@ It is possible to swap out any or all of these classes as long as the API model 
 
 Features supported:
 
-Authorization based on roles and permissions
-Authentication with bearer tokens
-SQL based collaborator store
-SQL based file metadata store
-SQL based file content store
+- Authorization based on roles and permissions
+- Authentication with bearer tokens
+- SQL based collaborator store
+- SQL based file metadata store
+- SQL based file content store
 
 TODO:
-RTC changes
-Unit testing framework
+
+- RTC changes
+- Unit testing framework
 
 # With pre-built contents managers
 

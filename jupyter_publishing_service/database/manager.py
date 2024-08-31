@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from jupyter_publishing_service.models import Permission, Role
+from jupyter_publishing_service.models.sql import Permission, Role
 
 async_engine = create_async_engine(
     f"sqlite+aiosqlite:///database.db",
@@ -48,20 +48,3 @@ async def create_db():
     async with async_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
         await create_roles_and_permissions()
-
-
-# class SessionManager(LoggingConfigurable):
-#     _engine = None
-#
-#     def __init__(self, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         sqlite_url = f"sqlite+aiosqlite:///{self.database_filepath}"
-#         connect_args = {"check_same_thread": False}
-#         self._engine = create_async_engine(
-#             sqlite_url, echo=True, future=True, connect_args=connect_args
-#         )
-#
-#     async def create_db(self):
-#         async with self._engine.begin() as conn:
-#             await conn.run_sync(SQLModel.metadata.create_all)
-#             await self.create_roles_and_permissions()

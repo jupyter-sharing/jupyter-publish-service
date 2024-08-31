@@ -1,9 +1,6 @@
-import uuid
-from typing import List
-
 from fastapi import APIRouter, Depends, Request
-from pydantic_core import from_json
 
+from ._version import __version__
 from .authenticator.service import authenticate
 from .authorizer.service import (
     authorize,
@@ -11,13 +8,12 @@ from .authorizer.service import (
     require_read_write_permissions,
 )
 from .database.manager import create_db
-from .models import (
-    CollaboratorRole,
-    CreateSharedFile,
-    PatchSharedFile,
-    SharedFile,
-    SharedFileWithCollaborators,
+from .models.rest import (
+    ServiceStatusResponse,
+    SharedFileRequestModel,
+    SharedFileResponseModel,
 )
+from .storagemanager import BaseStorageManager
 
 router = APIRouter()
 
@@ -27,82 +23,58 @@ async def on_startup():
     await create_db()
 
 
-@router.get(
-    "/sharing/{file_id}/collaborators",
-    dependencies=[Depends(authenticate), Depends(require_read_permissions), Depends(authorize)],
-    response_model=List[CollaboratorRole],
-)
-async def get_collaborators(file_id: uuid.UUID, request: Request) -> List[CollaboratorRole]:
-    app = router.app
-    print(request.state.user)
-    store = app.collaborator_store
-    results = await store.get(file=file_id)
-    return results.collaborators
+@router.get("/", response_model=ServiceStatusResponse)
+async def service_status():
+    """Check the status and health of service."""
+    return ServiceStatusResponse(version=__version__, status="healthy")
 
 
 @router.get(
     "/sharing/{file_id}",
     dependencies=[Depends(authenticate), Depends(require_read_permissions), Depends(authorize)],
-    response_model=SharedFileWithCollaborators,
+    response_model=SharedFileResponseModel,
 )
 async def get_file(
-    file_id: uuid.UUID, content: bool, request: Request
-) -> SharedFileWithCollaborators:
-    app = router.app
-    print(request.state.user)
-    store = app.collaborator_store
-    file_manager = app.file_manager
-    results = await store.get(file=str(file_id))
-    if content:
-        c = await file_manager.get(path=str(file_id), content=True, type="notebook")
-        results.content = c
-    return results
+    file_id: str,
+    request: Request,
+    contents: bool = False,
+    collaborators: bool = False,
+) -> SharedFileResponseModel:
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    return await storage_manager.get(file_id, contents=contents, collaborators=collaborators)
 
 
-@router.post("/sharing", response_model=SharedFile)
-async def add_file(body: CreateSharedFile) -> SharedFile:
-    app = router.app
-    store = app.collaborator_store
-    collaborators = body.collaborators
-    file_manager = app.file_manager
-    roles = body.roles
-    shared_file = SharedFile(
-        id=body.id,
-        name=body.name,
-        title=body.title,
-        author=body.author,
-        version=1,
-        shareable_link="http://127.0.0.1:9000/" + f"{body.id}",
-    )
-    for collaborator in collaborators:
-        await store.add(collaborator=collaborator, file=shared_file, roles=roles)
-    await file_manager.save(body.contents.model_dump(), str(body.id))
-    return shared_file
+@router.post(
+    "/sharing",
+    response_model=SharedFileResponseModel,
+)
+async def add_file(body: SharedFileRequestModel) -> SharedFileResponseModel:
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    return await storage_manager.add(body)
 
 
 @router.patch(
+    "/sharing",
+    dependencies=[
+        Depends(authenticate),
+        Depends(require_read_write_permissions),
+        Depends(authorize),
+    ],
+    response_model=SharedFileResponseModel,
+)
+async def patch_file(body: SharedFileRequestModel) -> SharedFileResponseModel:
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    return await storage_manager.update(body)
+
+
+@router.delete(
     "/sharing/{file_id}",
     dependencies=[
         Depends(authenticate),
         Depends(require_read_write_permissions),
         Depends(authorize),
     ],
-    response_model=SharedFileWithCollaborators,
 )
-async def patch_file(file_id: str, body: PatchSharedFile) -> SharedFileWithCollaborators:
-    app = router.app
-    store = app.collaborator_store
-    current = await store.get(file=file_id)
-    shared_file = SharedFile(
-        id=current.file.id,
-        name=current.file.name if body.name is None else body.name,
-        title=current.file.title if body.title is None else body.title,
-        author=current.file.author,
-        version=current.file.version + 1,  # Only if jupyterContents model changes
-        shareable_link=current.file.shareable_link,
-    )
-    collaborators = current.file.collaborators if body.collaborators is None else body.collaborators
-    roles = body.roles  # If empty, no update to roles for any collaborator
-    for collaborator in collaborators:
-        await store.update(collaborator=collaborator, file=shared_file, roles=roles)
-    return await store.get(file_id)
+async def delete_file(file_id: str):
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    return await storage_manager.delete(file_id)

@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from jupyter_publishing_service.models import Collaborator
+from jupyter_publishing_service.models.sql import Collaborator
 
 
 class UserStoreABC(ABC):
     @abstractmethod
-    def search_users(self, search_string: str) -> List[Collaborator]:
+    async def search_users(self, search_string: str) -> List[Collaborator]:
         """
         Search for users
 
@@ -23,7 +23,7 @@ class UserStoreABC(ABC):
         return NotImplemented
 
     @abstractmethod
-    def search_groups(self, search_string: str) -> List[Collaborator]:
+    async def search_groups(self, search_string: str) -> List[Collaborator]:
         """
         Search for groups
 
