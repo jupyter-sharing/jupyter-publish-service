@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, Request
 
 from ._version import __version__
@@ -27,6 +29,19 @@ async def on_startup():
 async def service_status():
     """Check the status and health of service."""
     return ServiceStatusResponse(version=__version__, status="healthy")
+
+
+@router.get(
+    "/sharing",
+    dependencies=[Depends(authenticate)],
+    response_model=List[SharedFileResponseModel],
+)
+async def list_files_for_user(
+    request: Request,
+):
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    user = request.state.user
+    return await storage_manager.list(user["email"])
 
 
 @router.get(

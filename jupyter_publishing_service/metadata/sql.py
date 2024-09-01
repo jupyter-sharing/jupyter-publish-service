@@ -1,4 +1,7 @@
-from sqlmodel import select
+from typing import List
+
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service.database.manager import get_session
@@ -32,6 +35,7 @@ class SQLMetadataStore(LoggingConfigurable):
             return shared_file
 
     async def delete(self, file_id: str):
+        session: AsyncSession
         async with self._session() as session:
             statement = select(SharedFileMetadata).where(SharedFileMetadata.id == file_id)
             results = await session.exec(statement)
@@ -48,6 +52,19 @@ class SQLMetadataStore(LoggingConfigurable):
             f_stmt = select(SharedFileMetadata).where(SharedFileMetadata.id == file_id)
             results = await session.exec(f_stmt)
             return results.first()
+
+    async def list(self, list_of_file_ids: List[str]) -> List[SharedFileMetadata]:
+        session: AsyncSession
+        async with self._session() as session:
+            print("did this owrk?")
+            print(list_of_file_ids)
+            statement = select(SharedFileMetadata).where(
+                col(SharedFileMetadata.id).in_(list_of_file_ids)
+            )
+            results = await session.exec(statement)
+            files = results.fetchall()
+            print(files)
+            return files
 
 
 MetadataStoreABC.register(SQLMetadataStore)

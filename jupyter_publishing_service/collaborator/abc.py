@@ -33,3 +33,11 @@ class CollaboratorStoreABC(metaclass=ABCMeta):
         User must be a collaborator on the file
         """
         return NotImplemented
+
+    @abstractmethod
+    async def list(self, user_id: str) -> List[str]:
+        """
+        Update user's permissions on the given file
+        User must be a collaborator on the file
+        """
+        return NotImplemented

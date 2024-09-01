@@ -1,4 +1,5 @@
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service.database.manager import get_session
@@ -37,8 +38,9 @@ class SQLFileStore(LoggingConfigurable):
             await create_or_update_jupyter_contents(session, file_id, file)
 
     async def delete(self, file_id: str):
+        session: AsyncSession
         async with self._session() as session:
-            statement = select(JupyterContentsModel.id).where(JupyterContentsModel.id == file_id)
+            statement = select(JupyterContentsModel).where(JupyterContentsModel.id == file_id)
             results = await session.exec(statement)
             for result in results:
                 await session.delete(result)

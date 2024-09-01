@@ -150,3 +150,8 @@ class SQLStorageManager(BaseStorageManager):
         if request_model.contents:
             await self.file_store.add(metadata.id, request_model.contents)
         return SharedFileResponseModel(metadata=metadata)
+
+    async def list(self, user_id: str) -> List[SharedFileResponseModel]:
+        file_ids = await self.collaborator_store.list(user_id)
+        metadatas = await self.metadata_store.list(file_ids)
+        return [SharedFileResponseModel(metadata=m) for m in metadatas]

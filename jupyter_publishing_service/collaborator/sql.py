@@ -1,6 +1,7 @@
 from typing import List
 
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service.collaborator.abc import CollaboratorStoreABC
@@ -79,6 +80,19 @@ class SQLCollaboratorStore(LoggingConfigurable):
                     email=collaborator.email, file=file_id, role=role.name
                 )
                 await create_or_update_role(session, collab_role)
+
+    async def list(self, user_id: str) -> List[str]:
+        """List all files that a collaborator has access to."""
+        session: AsyncSession
+        async with self._session() as session:
+            statement = select(CollaboratorRole.file).where(CollaboratorRole.email == user_id)
+            results = await session.exec(statement)
+            file_ids = results.fetchall()
+            return file_ids
+
+    async def search(self, substring) -> List[Collaborator]:
+        """Search a list of collaborators."""
+        pass
 
 
 CollaboratorStoreABC.register(SQLCollaboratorStore)
