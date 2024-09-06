@@ -2,7 +2,6 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from traitlets.config import LoggingConfigurable
 
-from jupyter_publishing_service.database.manager import get_session
 from jupyter_publishing_service.models.sql import JupyterContentsModel
 
 from .abc import FileStoreABC
@@ -21,25 +20,21 @@ async def create_or_update_jupyter_contents(session, file_id: str, file: Jupyter
 
 
 class SQLFileStore(LoggingConfigurable):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._session = get_session
-
     async def get(self, file_id: str) -> JupyterContentsModel:
-        async with self._session() as session:
+        async with self.parent.get_session() as session:
             stmt = select(JupyterContentsModel).where(JupyterContentsModel.id == file_id)
             results = await session.exec(stmt)
             file: JupyterContentsModel = results.first()
             return file
 
     async def add(self, file_id: str, file: JupyterContentsModel) -> JupyterContentsModel:
-        async with self._session() as session:
+        async with self.parent.get_session() as session:
             file.id = file_id
             await create_or_update_jupyter_contents(session, file_id, file)
 
     async def delete(self, file_id: str):
         session: AsyncSession
-        async with self._session() as session:
+        async with self.parent.get_session() as session:
             statement = select(JupyterContentsModel).where(JupyterContentsModel.id == file_id)
             results = await session.exec(statement)
             for result in results:
@@ -47,7 +42,7 @@ class SQLFileStore(LoggingConfigurable):
             await session.commit()
 
     async def update(self, file_id: str, file: JupyterContentsModel):
-        async with self._session() as session:
+        async with self.parent.get_session() as session:
             file.id = file_id
             await create_or_update_jupyter_contents(session, file_id, file)
 

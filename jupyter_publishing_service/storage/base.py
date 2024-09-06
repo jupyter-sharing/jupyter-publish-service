@@ -1,8 +1,10 @@
 from typing import List
 
-from traitlets import Instance, Type
+from traitlets import Instance, Type, default
 from traitlets.config import LoggingConfigurable
 
+from jupyter_publishing_service.authorizer.abc import AuthorizerABC
+from jupyter_publishing_service.authorizer.sqlrbac import SQLRoleBasedAuthorizer
 from jupyter_publishing_service.collaborator.abc import CollaboratorStoreABC
 from jupyter_publishing_service.collaborator.sql import SQLCollaboratorStore
 from jupyter_publishing_service.file.abc import FileStoreABC
@@ -12,43 +14,53 @@ from jupyter_publishing_service.metadata.sql import SQLMetadataStore
 from jupyter_publishing_service.user.abc import UserStoreABC
 from jupyter_publishing_service.user.sql import SQLUserStore
 
-from .models.rest import SharedFileRequestModel, SharedFileResponseModel
-from .models.sql import (
+from ..models.rest import SharedFileRequestModel, SharedFileResponseModel
+from ..models.sql import (
     Collaborator,
     CollaboratorRole,
     JupyterContentsModel,
     Role,
     SharedFileMetadata,
 )
+from .abc import StorageManagerABC
 
 
 class BaseStorageManager(LoggingConfigurable):
-    """A manager in charge of storing and gathering
-    data about a shared file. The data for any single file
-    could be stored in various local/remote locations. The
-    job of the storage manager is to know where to find this data
-    and optimize queries/requests based on these sources.
-    """
 
-    metadata_store_class = Type(
-        default_value=SQLMetadataStore,
-        klass="jupyter_publishing_service.metadata.abc.MetadataStoreABC",
-    ).tag(config=True)
+    authorization_store_class = Type(kclass=AuthorizerABC).tag(config=True)
 
-    collaborator_store_class = Type(
-        default_value=SQLCollaboratorStore,
-        klass="jupyter_publishing_service.collaborator.abc.CollaboratorStoreABC",
-    ).tag(config=True)
+    @default("authorization_store_class")
+    def _default_authorization_store_class(self):
+        return SQLRoleBasedAuthorizer
 
-    file_store_class = Type(
-        default_value=SQLFileStore,
-        klass="jupyter_publishing_service.file.abc.FileStoreABC",
-    ).tag(config=True)
+    metadata_store_class = Type(klass=MetadataStoreABC).tag(config=True)
 
-    user_store_class = Type(
-        default_value=SQLUserStore,
-        klass="jupyter_publishing_service.user.abc.UserStoreABC",
-    ).tag(config=True)
+    @default("metadata_store_class")
+    def _default_metadata_store_class(self):
+        return SQLMetadataStore
+
+    collaborator_store_class = Type(klass=CollaboratorStoreABC).tag(config=True)
+
+    @default("collaborator_store_class")
+    def _default_collaborator_store_class(self):
+        return SQLCollaboratorStore
+
+    file_store_class = Type(klass=FileStoreABC).tag(config=True)
+
+    @default("file_store_class")
+    def _default_file_store_class(self):
+        return SQLFileStore
+
+    user_store_class = Type(klass=UserStoreABC).tag(config=True)
+
+    @default("user_store_class")
+    def _default_user_store_class(self):
+        return SQLUserStore
+
+    authorization_store: AuthorizerABC = Instance(
+        klass="jupyter_publishing_service.authorizer.abc.AuthorizerABC",
+        allow_none=True,
+    )
 
     metadata_store: MetadataStoreABC = Instance(
         klass="jupyter_publishing_service.metadata.abc.MetadataStoreABC",
@@ -71,29 +83,18 @@ class BaseStorageManager(LoggingConfigurable):
     )
 
     def initialize(self):
-        raise NotImplementedError("Must be implemented in a subclass.")
-
-    async def get(
-        self, file_id: str, collaborators: bool = False, contents: bool = False
-    ) -> SharedFileResponseModel:
-        raise NotImplementedError("Must be implemented in a subclass.")
-
-    async def add(self, request_model: SharedFileRequestModel) -> SharedFileResponseModel:
-        raise NotImplementedError("Must be implemented in a subclass.")
-
-    async def delete(self, file_id: str):
-        raise NotImplementedError("Must be implemented in a subclass.")
-
-    async def update(self, request_model: SharedFileRequestModel) -> SharedFileResponseModel:
-        raise NotImplementedError("Must be implemented in a subclass.")
-
-
-class SQLStorageManager(BaseStorageManager):
-    def initialize(self):
+        self.authorization_store = self.authorization_store_class(parent=self, log=self.log)
         self.metadata_store = self.metadata_store_class(parent=self, log=self.log)
         self.collaborator_store = self.collaborator_store_class(parent=self, log=self.log)
         self.file_store = self.file_store_class(parent=self, log=self.log)
         self.user_store = self.user_store_class(parent=self, log=self.log)
+
+    async def start(self):
+        # Don't do anything here. Subclasses can use this to initialize a e.g. database.
+        ...
+
+    async def authorize(self, user: Collaborator, file_id: str) -> bool:
+        return await self.authorization_store.authorize(user, file_id)
 
     async def get(
         self, file_id: str, collaborators: bool = False, contents: bool = False
@@ -160,3 +161,6 @@ class SQLStorageManager(BaseStorageManager):
 
     async def search_users(self, substring) -> List[Collaborator]:
         ...
+
+
+StorageManagerABC.register(BaseStorageManager)

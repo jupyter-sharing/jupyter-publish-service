@@ -1,28 +1,45 @@
+from contextlib import asynccontextmanager
 from typing import List
 
 from fastapi import APIRouter, Depends, Request
+from starlette.exceptions import HTTPException
 
 from ._version import __version__
 from .authenticator.service import authenticate
-from .authorizer.service import (
-    authorize,
-    require_read_permissions,
-    require_read_write_permissions,
-)
-from .database.manager import create_db
+from .authorizer.service import require_read_permissions, require_read_write_permissions
 from .models.rest import (
     ServiceStatusResponse,
     SharedFileRequestModel,
     SharedFileResponseModel,
 )
-from .storagemanager import BaseStorageManager
+from .storage.base import BaseStorageManager
 
 router = APIRouter()
 
 
-@router.on_event("startup")
-async def on_startup():
-    await create_db()
+async def authorize(request: Request):
+    user = request.state.user
+    permissions = request.state.permissions
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    action = request.method.lower()
+    data = await request.json() if action in ["post", "put"] else {}
+    resource_name = request.url.path.strip("/").split("/")[1]
+    file_id = data.get("id") if action in ["post", "put"] else resource_name
+    data["permissions"] = permissions
+    data["file_id"] = file_id
+    allowed = await storage_manager.authorization_store.authorize(user, data)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return True
+
+
+@asynccontextmanager
+async def lifespan(app):
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    await storage_manager.start()
+    yield
 
 
 @router.get("/", response_model=ServiceStatusResponse)

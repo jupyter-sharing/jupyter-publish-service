@@ -6,7 +6,6 @@ from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service import constants
 from jupyter_publishing_service.authorizer.abc import AuthorizerABC
-from jupyter_publishing_service.database.manager import get_session
 from jupyter_publishing_service.models.sql import (
     CollaboratorRole,
     PermissionRoleLink,
@@ -15,7 +14,7 @@ from jupyter_publishing_service.models.sql import (
 from jupyter_publishing_service.traits import UnicodeFromEnv
 
 
-class RBACAuthorizer(LoggingConfigurable):
+class SQLRoleBasedAuthorizer(LoggingConfigurable):
 
     email_claim = UnicodeFromEnv(
         name=constants.EMAIL_CLAIM_KEY,
@@ -24,13 +23,9 @@ class RBACAuthorizer(LoggingConfigurable):
         allow_none=True,
     ).tag(config=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._session = get_session
-
     async def authorize(self, user, data) -> bool:
         session: AsyncSession
-        async with self._session() as session:
+        async with self.parent.get_session() as session:
             email = user.get(self.email_claim)
             required_perms = [perm.name for perm in data["permissions"]]
             file_id = data["file_id"]
@@ -57,4 +52,4 @@ class RBACAuthorizer(LoggingConfigurable):
             return False
 
 
-AuthorizerABC.register(RBACAuthorizer)
+AuthorizerABC.register(SQLRoleBasedAuthorizer)
