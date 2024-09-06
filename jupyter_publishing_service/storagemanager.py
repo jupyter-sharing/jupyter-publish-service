@@ -141,17 +141,22 @@ class SQLStorageManager(BaseStorageManager):
         await self.file_store.delete(file_id)
         await self.metadata_store.delete(file_id)
 
-    async def update(self, request_model: SharedFileRequestModel) -> SharedFileResponseModel:
+    async def update(
+        self, file_id: str, request_model: SharedFileRequestModel
+    ) -> SharedFileResponseModel:
         metadata = await self.metadata_store.update(request_model.metadata)
         if request_model.collaborators:
             await self.collaborator_store.update(
-                request_model.metadata.id, request_model.collaborators, request_model.roles
+                file_id, request_model.collaborators, request_model.roles
             )
         if request_model.contents:
-            await self.file_store.add(metadata.id, request_model.contents)
+            await self.file_store.add(file_id, request_model.contents)
         return SharedFileResponseModel(metadata=metadata)
 
     async def list(self, user_id: str) -> List[SharedFileResponseModel]:
         file_ids = await self.collaborator_store.list(user_id)
         metadatas = await self.metadata_store.list(file_ids)
         return [SharedFileResponseModel(metadata=m) for m in metadatas]
+
+    async def search_users(self, substring) -> List[Collaborator]:
+        ...

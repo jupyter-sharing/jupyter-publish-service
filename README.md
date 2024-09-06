@@ -1,6 +1,6 @@
-# Jupyter Notebook Publishing Service
+# Jupyter Publishing Service
 
-A (backend agnostic) service for publishing sharable Jupyter content
+A (backend agnostic) service for publishing sharable Jupyter content.
 
 By default, publishing service uses SQL lite database with asyncIO drivers. The database is used for storing users, file metadata and permissions, collaborators, and also actual files themselves.
 It is possible to swap out any or all of these classes as long as the API model and data model is consistent. To swap out, content manager use the steps below

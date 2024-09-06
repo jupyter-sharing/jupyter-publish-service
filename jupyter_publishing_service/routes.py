@@ -36,7 +36,7 @@ async def service_status():
     dependencies=[Depends(authenticate)],
     response_model=List[SharedFileResponseModel],
 )
-async def list_files_for_user(
+async def list_files(
     request: Request,
 ):
     storage_manager: BaseStorageManager = router.app.storage_manager
@@ -69,7 +69,7 @@ async def add_file(body: SharedFileRequestModel) -> SharedFileResponseModel:
 
 
 @router.patch(
-    "/sharing",
+    "/sharing/{file_id}",
     dependencies=[
         Depends(authenticate),
         Depends(require_read_write_permissions),
@@ -77,9 +77,9 @@ async def add_file(body: SharedFileRequestModel) -> SharedFileResponseModel:
     ],
     response_model=SharedFileResponseModel,
 )
-async def patch_file(body: SharedFileRequestModel) -> SharedFileResponseModel:
+async def update_file(file_id: str, body: SharedFileRequestModel) -> SharedFileResponseModel:
     storage_manager: BaseStorageManager = router.app.storage_manager
-    return await storage_manager.update(body)
+    return await storage_manager.update(file_id, body)
 
 
 @router.delete(
