@@ -1,9 +1,10 @@
 """
 SQL models for storing publishing data.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
+from pydantic import field_validator
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -60,6 +61,9 @@ class JupyterContentsModel(SQLModel, table=True):
 
 
 class SharedFileMetadata(SQLModel, table=True):
+    class Config:
+        validate_assignment = True
+
     id: str = Field(primary_key=True, description="A unique ID for a shared file.")
     author: Optional[str] = Field(
         description="The document's author's name. This should be a human readable name."

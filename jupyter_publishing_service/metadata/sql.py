@@ -9,7 +9,9 @@ from jupyter_publishing_service.models.sql import SharedFileMetadata
 from .abc import MetadataStoreABC
 
 
-async def create_or_update_file(session, metadata: SharedFileMetadata) -> SharedFileMetadata:
+async def create_or_update_file(
+    session: AsyncSession, metadata: SharedFileMetadata
+) -> SharedFileMetadata:
     current_file = await session.get(SharedFileMetadata, metadata.id)
     if current_file is None:
         current_file = metadata
