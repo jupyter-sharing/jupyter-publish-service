@@ -3,9 +3,11 @@ import socket
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi as _get_openapi
 from jupyter_core.application import JupyterApp
 from traitlets import Instance, Integer, Type, Unicode, default, validate
 
+from jupyter_publishing_service._version import __version__
 from jupyter_publishing_service.authenticator.jwt_authenticator import JWTAuthenticator
 from jupyter_publishing_service.authenticator.service import set_authenticator_class
 from jupyter_publishing_service.authorizer.sqlrbac import AuthorizerABC
@@ -16,12 +18,30 @@ from jupyter_publishing_service.storage.sql import SQLStorageManager
 DEFAULT_JUPYTER_PUBLISHING_PORT = 9000
 
 
+TITLE = "Jupyter Publishing Service"
+SUMMARY = "A Jupyter service for publishing notebooks and sharing them with Jupyter servers."
+DESCRIPTION = """
+# Jupyter Publishing Service
+
+* [Github repo](https://github.com/jupyter-sharing/jupyter-publish-service)
+"""
+
+
+def get_openapi_schema():
+    return _get_openapi(
+        title=TITLE,
+        version=__version__,
+        summary=SUMMARY,
+        description=DESCRIPTION,
+        routes=router.routes,
+    )
+
+
 class JupyterPublishingService(JupyterApp):
 
     name = "publishing"
-    description = (
-        "A Jupyter service for publishing notebooks and sharing them with Jupyter servers."
-    )
+    title = TITLE
+    description = SUMMARY
 
     authenticator_class = Type(
         kclass="jupyter_publishing_service.authenticator.abc.AuthenticatorABC",
@@ -89,8 +109,8 @@ class JupyterPublishingService(JupyterApp):
 
     def init_webapp(self):
         self.app = FastAPI(
-            title="Jupyter Publishing Server",
-            description="Jupyter File Publishing Server implementation powered by FastAPI.",
+            title=TITLE,
+            description=SUMMARY,
             lifespan=lifespan,
         )
         self.app.include_router(router)
