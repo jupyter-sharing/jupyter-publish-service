@@ -32,7 +32,6 @@ class SQLMetadataStore(LoggingConfigurable):
             return shared_file
 
     async def delete(self, file_id: str):
-        session: AsyncSession
         async with self.parent.get_session() as session:
             statement = select(SharedFileMetadata).where(SharedFileMetadata.id == file_id)
             results = await session.exec(statement)
@@ -51,7 +50,6 @@ class SQLMetadataStore(LoggingConfigurable):
             return results.first()
 
     async def list(self, list_of_file_ids: List[str]) -> List[SharedFileMetadata]:
-        session: AsyncSession
         async with self.parent.get_session() as session:
             statement = select(SharedFileMetadata).where(
                 col(SharedFileMetadata.id).in_(list_of_file_ids)

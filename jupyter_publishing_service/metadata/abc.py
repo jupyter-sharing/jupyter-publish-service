@@ -34,3 +34,7 @@ class MetadataStoreABC(metaclass=ABCMeta):
         Get collaborators on a given file with their permissions
         """
         return NotImplemented
+
+    @abstractmethod
+    async def list(self, list_of_file_ids: List[str]) -> List[SharedFileMetadata]:
+        return NotImplemented

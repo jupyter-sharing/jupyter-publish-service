@@ -2,10 +2,10 @@ from contextlib import asynccontextmanager
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.security import HTTPBearer
 from starlette.exceptions import HTTPException
 
 from ._version import __version__
-from .authenticator.service import authenticate
 from .authorizer.service import require_read_permissions, require_read_write_permissions
 from .models.rest import (
     Collaborator,
@@ -15,6 +15,8 @@ from .models.rest import (
 )
 from .models.sql import Collaborator
 from .storage.base import BaseStorageManager
+
+httpBearer = HTTPBearer()
 
 router = APIRouter()
 
@@ -35,6 +37,20 @@ async def authorize(request: Request):
     if not allowed:
         raise HTTPException(status_code=403, detail="Not authorized")
     return True
+
+
+async def authenticate(request: Request) -> dict:
+    """Token based authenticated"""
+    credentials = await httpBearer(request)
+    authenticator = router.app.authenticator
+    if credentials.scheme != "Bearer":
+        raise HTTPException(status_code=403, detail="Unsupported authentication method")
+    data = {"token": credentials.credentials}
+    user = await authenticator.authenticate(data)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    request.state.user = user  # type: ignore
+    return user
 
 
 @asynccontextmanager
