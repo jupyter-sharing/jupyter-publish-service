@@ -4,14 +4,14 @@ SQL models for storing publishing data.
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from pydantic import field_validator
+from pydantic import field_serializer
 from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
 class Collaborator(SQLModel, table=True):
-    email: str = Field(primary_key=True)
-    name: Optional[str]
+    name: str = Field(primary_key=True)
+    # display_name: Optional[str]
 
 
 class PermissionRoleLink(SQLModel, table=True):
@@ -36,10 +36,10 @@ class Permission(SQLModel, table=True):
 
 class CollaboratorRole(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
-    email: str = Field(foreign_key="collaborator.email", index=True)
+    name: str = Field(foreign_key="collaborator.name", index=True)
     file: str = Field(foreign_key="sharedfilemetadata.id", index=True)
     role: str = Field(foreign_key="role.name")
-    __table_args__ = (UniqueConstraint("email", "file", "role", name="unique_cfr"),)
+    __table_args__ = (UniqueConstraint("name", "file", "role", name="unique_cfr"),)
 
 
 class JupyterContentsModel(SQLModel, table=True):
@@ -58,6 +58,10 @@ class JupyterContentsModel(SQLModel, table=True):
     mimetype: Optional[str] = None
     content: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     format: Optional[str] = None
+
+    @field_serializer("created", "last_modified", when_used="always")
+    def serialize_courses_in_order(self, val: datetime):
+        return val.isoformat()
 
 
 class SharedFileMetadata(SQLModel, table=True):
@@ -83,3 +87,7 @@ class SharedFileMetadata(SQLModel, table=True):
         description="A public link to share a static version of this notebook."
     )
     server_id: Optional[str] = Field(description="A unique ID of the server that 'owns' this file.")
+
+    @field_serializer("created", "last_modified", when_used="always")
+    def serialize_courses_in_order(self, val: datetime):
+        return val.isoformat()

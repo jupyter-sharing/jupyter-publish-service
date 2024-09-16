@@ -1,30 +1,35 @@
-from typing import List
+from typing import List, Optional
 
-import cachetools
+from aiocache import Cache, cached
 from sqlalchemy import select
 from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service.models.sql import Collaborator
 from jupyter_publishing_service.user.abc import UserStoreABC
 
-cache = cachetools.TTLCache(maxsize=256, ttl=120)
-
 
 class SQLUserStore(LoggingConfigurable):
-    @cachetools.cached(cache)
+    """A user store that searches a list of
+    all collaborators already in the publishing
+    service database.
+    """
+
+    @cached(ttl=120, cache=Cache.MEMORY)
     async def get_all_collaborators(self) -> List[Collaborator]:
         async with self.parent.get_session() as session:
             stmt = select(Collaborator)
             results = await session.exec(stmt)
-            return results.all()
+            records = results.all()
+            collaborators = [row[0] for row in records]
+        return collaborators
 
-    async def search_users(self, search_string: str) -> List[Collaborator]:
+    async def search_users(self, search_string: Optional[str]) -> List[Collaborator]:
         collaborators = await self.get_all_collaborators()
-        names = [x for x in collaborators if x.name.startswith(search_string)]
-        emails = [y for y in collaborators if y.email.startswith(search_string)]
-        return names + emails
+        if search_string:
+            return [x for x in collaborators if x.name.startswith(search_string)]
+        return collaborators
 
-    async def search_groups(self, search_string: str) -> List[Collaborator]:
+    async def search_groups(self, search_string: Optional[str] = None) -> List[Collaborator]:
         return await self.search_users(search_string)
 
 

@@ -15,24 +15,16 @@ from jupyter_publishing_service.traits import UnicodeFromEnv
 
 
 class SQLRoleBasedAuthorizer(LoggingConfigurable):
-
-    email_claim = UnicodeFromEnv(
-        name=constants.EMAIL_CLAIM_KEY,
-        help="key denoting email claim in the JWT. Email address is assumed to be unique",
-        default_value="email",
-        allow_none=True,
-    ).tag(config=True)
-
     async def authorize(self, user, data) -> bool:
         session: AsyncSession
         async with self.parent.get_session() as session:
-            email = user.get(self.email_claim)
+            name = user.get("name")
             required_perms = [perm.name for perm in data["permissions"]]
             file_id = data["file_id"]
             c_stmt = (
                 select(CollaboratorRole.role)
                 .where(CollaboratorRole.file == file_id)
-                .where(CollaboratorRole.email == email)
+                .where(CollaboratorRole.name == name)
             )
             results = await session.exec(c_stmt)
             roles = results.all()

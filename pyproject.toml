@@ -31,7 +31,8 @@ dependencies = [
     "sqlmodel",
     "aiosqlite",
     "jwcrypto",
-    "httpx"
+    "httpx",
+    "aiocache"
 ]
 
 [project.optional-dependencies]

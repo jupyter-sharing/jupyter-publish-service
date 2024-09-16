@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Request
 from starlette.exceptions import HTTPException
@@ -8,10 +8,12 @@ from ._version import __version__
 from .authenticator.service import authenticate
 from .authorizer.service import require_read_permissions, require_read_write_permissions
 from .models.rest import (
+    Collaborator,
     ServiceStatusResponse,
     SharedFileRequestModel,
     SharedFileResponseModel,
 )
+from .models.sql import Collaborator
 from .storage.base import BaseStorageManager
 
 router = APIRouter()
@@ -58,7 +60,18 @@ async def list_files(
 ):
     storage_manager: BaseStorageManager = router.app.storage_manager
     user = request.state.user
-    return await storage_manager.list(user["email"])
+    return await storage_manager.list(user["name"])
+
+
+@router.get(
+    "/sharing/users",
+    dependencies=[
+        Depends(authenticate),
+    ],
+)
+async def search_users(substring: Optional[str] = None) -> List[Collaborator]:
+    storage_manager: BaseStorageManager = router.app.storage_manager
+    return await storage_manager.search_users(substring)
 
 
 @router.get(

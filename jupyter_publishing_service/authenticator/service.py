@@ -16,6 +16,7 @@ def set_authenticator_class(authenticator_class: AuthenticatorABC):
 
 
 async def authenticate(request: Request) -> dict:
+    """Token based authenticated"""
     credentials = await httpBearer(request)
     if credentials.scheme != "Bearer":
         raise HTTPException(status_code=403, detail="Unsupported authentication method")

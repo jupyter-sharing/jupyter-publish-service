@@ -9,7 +9,7 @@ from jupyter_publishing_service.models.sql import Collaborator, CollaboratorRole
 
 
 async def create_or_update_collaborator(session, collaborator: Collaborator):
-    current_collaborator = await session.get(Collaborator, collaborator.email)
+    current_collaborator = await session.get(Collaborator, collaborator.name)
     if current_collaborator is None:
         current_collaborator = collaborator
     setattr(current_collaborator, "name", collaborator.name)
@@ -22,7 +22,7 @@ async def create_or_update_collaborator(session, collaborator: Collaborator):
 async def create_or_update_role(session, role: CollaboratorRole):
     statement = (
         select(CollaboratorRole)
-        .where(CollaboratorRole.email == role.email)
+        .where(CollaboratorRole.name == role.name)
         .where(CollaboratorRole.file == role.file)
         .where(CollaboratorRole.role == role.role)
     )
@@ -49,9 +49,7 @@ class SQLCollaboratorStore(LoggingConfigurable):
         async with self.parent.get_session() as session:
             await create_or_update_collaborator(session, collaborator)
             for role in roles:
-                collab_role = CollaboratorRole(
-                    email=collaborator.email, file=file_id, role=role.name
-                )
+                collab_role = CollaboratorRole(name=collaborator.name, file=file_id, role=role.name)
                 await create_or_update_role(session, collab_role)
             await session.commit()
 
@@ -59,7 +57,7 @@ class SQLCollaboratorStore(LoggingConfigurable):
         async with self.parent.get_session() as session:
             statement = (
                 select(CollaboratorRole)
-                .where(CollaboratorRole.email == collaborator.email)
+                .where(CollaboratorRole.name == collaborator.name)
                 .where(CollaboratorRole.file == file_id)
             )
             results = await session.exec(statement)
@@ -71,16 +69,14 @@ class SQLCollaboratorStore(LoggingConfigurable):
         async with self.parent.get_session() as session:
             await create_or_update_collaborator(session, collaborator)
             for role in roles:
-                collab_role = CollaboratorRole(
-                    email=collaborator.email, file=file_id, role=role.name
-                )
+                collab_role = CollaboratorRole(name=collaborator.name, file=file_id, role=role.name)
                 await create_or_update_role(session, collab_role)
 
     async def list(self, user_id: str) -> List[str]:
         """List all files that a collaborator has access to."""
         session: AsyncSession
         async with self.parent.get_session() as session:
-            statement = select(CollaboratorRole.file).where(CollaboratorRole.email == user_id)
+            statement = select(CollaboratorRole.file).where(CollaboratorRole.name == user_id)
             results = await session.exec(statement)
             file_ids = results.fetchall()
             return file_ids

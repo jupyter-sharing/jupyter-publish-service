@@ -8,7 +8,7 @@ from jupyter_core.application import JupyterApp
 from traitlets import Instance, Integer, Type, Unicode, default, validate
 
 from jupyter_publishing_service._version import __version__
-from jupyter_publishing_service.authenticator.jwt_authenticator import JWTAuthenticator
+from jupyter_publishing_service.authenticator.jwt import JWTAuthenticator
 from jupyter_publishing_service.authenticator.service import set_authenticator_class
 from jupyter_publishing_service.authorizer.sqlrbac import AuthorizerABC
 from jupyter_publishing_service.routes import lifespan, router
@@ -104,6 +104,7 @@ class JupyterPublishingService(JupyterApp):
     def init_configurables(self):
         self.authenticator = self.authenticator_class(parent=self, log=self.log)
         set_authenticator_class(self.authenticator)
+        print(self.authenticator)
         self.storage_manager = self.storage_manager_class(parent=self, log=self.log)
         self.storage_manager.initialize()
 

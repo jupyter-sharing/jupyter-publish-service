@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from traitlets import Instance, Type, default
 from traitlets.config import LoggingConfigurable
@@ -120,7 +120,7 @@ class BaseStorageManager(LoggingConfigurable):
         if request_model.collaborators:
             for collaborator in request_model.collaborators:
                 # The author should have writer permissions.
-                if collaborator.email == metadata.author:
+                if collaborator.name == metadata.author:
                     await self.collaborator_store.add(
                         request_model.metadata.id, collaborator, [Role(name="WRITER")]
                     )
@@ -137,7 +137,7 @@ class BaseStorageManager(LoggingConfigurable):
         collaborator_roles = await self.collaborator_store.get(file_id=file_id)
         # NOTE: we should refactor this to delete as a batch, not one-by-one.
         for cr in collaborator_roles:
-            await self.collaborator_store.delete(file_id, Collaborator(email=cr.email))
+            await self.collaborator_store.delete(file_id, Collaborator(name=cr.name))
         # Delete file and metadata
         await self.file_store.delete(file_id)
         await self.metadata_store.delete(file_id)
@@ -159,8 +159,8 @@ class BaseStorageManager(LoggingConfigurable):
         metadatas = await self.metadata_store.list(file_ids)
         return [SharedFileResponseModel(metadata=m) for m in metadatas]
 
-    async def search_users(self, substring) -> List[Collaborator]:
-        ...
+    async def search_users(self, substring: Optional[str]) -> List[Collaborator]:
+        return await self.user_store.search_users(substring)
 
 
 StorageManagerABC.register(BaseStorageManager)
