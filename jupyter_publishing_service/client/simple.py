@@ -9,7 +9,7 @@ from jupyter_publishing_service.models.rest import (
     SharedFileRequestModel,
     SharedFileResponseModel,
 )
-from jupyter_publishing_service.models.sql import Collaborator
+from jupyter_publishing_service.models.sql import User
 
 from .abc import ClientABC
 
@@ -31,13 +31,13 @@ class SimpleAsyncClient(LoggingConfigurable):
         return {}
 
     async def service_status(self) -> ServiceStatusResponse:
-        url = (self.service_url + "/",)
+        url = self.service_url + "/"
         async with AsyncClient(verify=True) as client:
             response = await client.get(url)
             return ServiceStatusResponse.model_validate(response.json())
 
     async def list_files(self) -> List[SharedFileResponseModel]:
-        url = (self.service_url + "/sharing",)
+        url = self.service_url + "/sharing"
         async with AsyncClient(verify=True) as client:
             response = await client.get(url, headers=self.headers)
             data = response.json()
@@ -48,7 +48,7 @@ class SimpleAsyncClient(LoggingConfigurable):
     ) -> SharedFileResponseModel:
         url = (
             self.service_url
-            + f"/sharing/{file_id}?contents={int(contents)}&collaborators={int(collaborators)}",
+            + f"/sharing/{file_id}?contents={int(contents)}&collaborators={int(collaborators)}"
         )
         async with AsyncClient(verify=True) as client:
             response = await client.get(url, headers=self.headers)
@@ -63,26 +63,25 @@ class SimpleAsyncClient(LoggingConfigurable):
             return SharedFileResponseModel.model_validate(response.json())
 
     async def update_file(self, request: SharedFileRequestModel) -> SharedFileResponseModel:
-        url = (self.service_url + f"/sharing/{request.metadata.id}",)
+        url = self.service_url + f"/sharing/{request.metadata.id}"
         async with AsyncClient(verify=True) as client:
             response = await client.post(url, headers=self.headers, json=request.model_dump_json())
             return SharedFileResponseModel.model_validate(response.json())
 
     async def delete_file(self, file_id: str):
-        url = (self.service_url + "/sharing/{file_id}",)
+        url = self.service_url + f"/sharing/{file_id}"
         async with AsyncClient(verify=True) as client:
             await client.delete(url, headers=self.headers)
 
-    async def search_users(self, substring: Optional[str] = None) -> List[Collaborator]:
+    async def search_users(self, substring: Optional[str] = None) -> List[User]:
         url = self.service_url + "/sharing/users"
         if substring:
             url += "?substring={substring}"
         async with AsyncClient(verify=True) as client:
             response = await client.get(url, headers=self.headers)
-            print(response)
             collaborators = []
             for item in response.json():
-                collab = Collaborator.model_validate(item)
+                collab = User.model_validate(item)
                 collaborators.append(collab)
             return collaborators
 
