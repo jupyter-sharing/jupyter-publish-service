@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 
+from jupyter_publishing_service.models.sql import User
+
 
 class AuthorizerABC(ABC):
     @abstractmethod
-    def authorize(self, user, data) -> bool:
+    async def authorize(self, user: User, action: str, file_id: str) -> bool:
         """
         Authorizer a user with given data
 

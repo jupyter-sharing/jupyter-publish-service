@@ -1,9 +1,11 @@
 from abc import ABCMeta, abstractmethod
 
+from jupyter_publishing_service.models.sql import User
+
 
 class AuthenticatorABC(metaclass=ABCMeta):
     @abstractmethod
-    async def authenticate(self, data) -> dict:
+    async def authenticate(self, token: str) -> User:
         """
         Authenticate a user with login data
 

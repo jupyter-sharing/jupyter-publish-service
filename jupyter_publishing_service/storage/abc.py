@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from ..models.rest import SharedFileRequestModel, SharedFileResponseModel
-from ..models.sql import Collaborator
+from ..models.sql import User
 
 
 class StorageManagerABC(ABC):
@@ -25,7 +25,7 @@ class StorageManagerABC(ABC):
         raise NotImplementedError("Must be implemented in a subclass.")
 
     @abstractmethod
-    async def authorize(self, user: Collaborator, file_id: str):
+    async def authorize(self, user: User, file_id: str):
         raise NotImplementedError("Must be implemented in a subclass.")
 
     @abstractmethod
@@ -51,5 +51,5 @@ class StorageManagerABC(ABC):
         raise NotImplementedError("Must be implemented in a subclass.")
 
     @abstractmethod
-    async def search_users(self, substring: Optional[str]) -> List[Collaborator]:
+    async def search_users(self, substring: Optional[str]) -> List[User]:
         raise NotImplementedError("Must be implemented in a subclass.")
