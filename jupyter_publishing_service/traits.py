@@ -1,6 +1,7 @@
 import os
+import typing as t
 
-from traitlets import Bool, Int, Undefined, Unicode
+from traitlets import Bool, Int, TraitType, Undefined, Unicode
 
 
 class FromEnvMixin:

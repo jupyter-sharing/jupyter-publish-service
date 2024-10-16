@@ -1,33 +1,33 @@
-import uuid
 from abc import ABCMeta, abstractmethod
 from typing import List
 
-from jupyter_publishing_service.models import (
-    Collaborator,
-    CollaboratorRole,
-    Role,
-    SharedFile,
-    SharedFileWithCollaborators,
-)
+from jupyter_publishing_service.models.sql import Collaborator, CollaboratorRole, Role
 
 
-class CollaboratorStore(metaclass=ABCMeta):
+class CollaboratorStoreABC(metaclass=ABCMeta):
     @abstractmethod
-    async def add(self, collaborator: Collaborator, file: SharedFile, roles: List[Role]):
+    async def get(self, file_id: str) -> List[CollaboratorRole]:
+        """
+        Get collaborators on a given file with their permissions
+        """
+        return NotImplemented
+
+    @abstractmethod
+    async def add(self, file_id: str, collaborator: Collaborator, roles: List[Role]):
         """
         Add a user as a collaborator on the given file with given roles
         """
         return NotImplemented
 
     @abstractmethod
-    async def delete(self, collaborator: Collaborator, file: SharedFile):
+    async def delete(self, file_id: str, collaborator: Collaborator):
         """
         Remove the user as a collaborator on the give file
         """
         return NotImplemented
 
     @abstractmethod
-    async def update(self, collaborator: Collaborator, file: SharedFile, roles: List[Role]):
+    async def update(self, file_id: str, collaborator: Collaborator, roles: List[Role]):
         """
         Update user's permissions on the given file
         User must be a collaborator on the file
@@ -35,8 +35,9 @@ class CollaboratorStore(metaclass=ABCMeta):
         return NotImplemented
 
     @abstractmethod
-    async def get(self, file: uuid.UUID) -> SharedFileWithCollaborators:
+    async def list(self, user_id: str) -> List[str]:
         """
-        Get collaborators on a given file with their permissions
+        Update user's permissions on the given file
+        User must be a collaborator on the file
         """
         return NotImplemented

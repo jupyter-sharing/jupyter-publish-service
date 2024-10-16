@@ -1,6 +1,6 @@
 import jwcrypto.jws as jws
 import jwcrypto.jwt as jwt
-from httpx import AsyncClient, Client, create_ssl_context
+from httpx import AsyncClient, create_ssl_context
 from jwcrypto.common import base64url_decode, json_decode
 from jwcrypto.jwk import JWK
 from traitlets import Dict
@@ -12,7 +12,9 @@ from jupyter_publishing_service.traits import UnicodeFromEnv
 
 
 class JWTAuthenticator(LoggingConfigurable):
+
     _alg = "RS256"
+
     public_key_url = UnicodeFromEnv(
         name=constants.JWKS_URI,
         help="JWK URI of keys used for signing the JWT e.g https://www.googleapis.com/oauth2/v3/certs",
