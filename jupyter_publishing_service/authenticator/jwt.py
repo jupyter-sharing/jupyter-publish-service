@@ -8,6 +8,7 @@ from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service import constants
 from jupyter_publishing_service.authenticator.abc import AuthenticatorABC
+from jupyter_publishing_service.models.sql import User
 from jupyter_publishing_service.traits import UnicodeFromEnv
 
 
@@ -83,7 +84,7 @@ class JWTAuthenticator(LoggingConfigurable):
             return -1
 
     @staticmethod
-    def get_current_user(jwt_token: str, public_key: JWK) -> dict:
+    def get_current_user(jwt_token: str, public_key: JWK) -> User:
         decoded_jwt = jwt.JWT(
             jwt=jwt_token,
             key=public_key,
@@ -91,10 +92,10 @@ class JWTAuthenticator(LoggingConfigurable):
                 "exp": None,
             },
         )
-        return json_decode(decoded_jwt.claims)
+        data = json_decode(decoded_jwt.claims)
+        return User(username=data["email"])
 
-    async def authenticate(self, credentials: dict) -> dict:
-        token = credentials["token"]
+    async def authenticate(self, token: str) -> User:
         public_key = await self.get_public_key_by_kid(token)
         try:
             return self.get_current_user(token, public_key)

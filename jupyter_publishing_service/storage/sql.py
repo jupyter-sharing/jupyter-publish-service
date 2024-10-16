@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from traitlets import Instance, Unicode
+from traitlets import Bool, Instance, Unicode
 
 from jupyter_publishing_service.models.sql import Permission, Role
 
@@ -17,11 +17,12 @@ class SQLStorageManager(BaseStorageManager):
 
     database_path = Unicode(default_value="sqlite+aiosqlite:///database.db")
     _async_engine = Instance(AsyncEngine, allow_none=True)
+    echo = Bool(default_value=False, help="Echo SQL queries for debugging.").tag(config=True)
 
     def initialize(self):
         self._async_engine = create_async_engine(
             self.database_path,
-            echo=True,
+            echo=self.echo,
             future=True,
             connect_args={"check_same_thread": False},
         )
