@@ -19,8 +19,9 @@ Features supported:
 - SQL based file content store
 
 TODO:
-RTC changes
-Unit testing framework
+
+- RTC changes
+- Unit testing framework
 
 # With pre-built contents managers
 
