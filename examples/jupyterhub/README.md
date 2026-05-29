@@ -14,6 +14,17 @@ collides.
 hub users (alice and bob), and walks through alice creating a
 notebook share that bob can read.
 
+Prerequisites:
+- `jupyter-publish-service` installed (`pip install -e .` from the
+  repo root) — pulls in JupyterHub and `aiosqlite`/`greenlet`/etc.
+- [`configurable-http-proxy`](https://github.com/jupyterhub/configurable-http-proxy):
+  JupyterHub's default proxy, distributed as a Node.js package.
+  Install with `npm install -g configurable-http-proxy` (install
+  Node.js first if `npm` is not on your PATH).
+- `openssl` for generating per-run secrets.
+
+Then:
+
 ```
 ./run_demo.sh
 ```

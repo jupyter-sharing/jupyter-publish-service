@@ -25,7 +25,11 @@ import os
 
 from jupyter_publishing_service.constants import JUPYTERHUB_SCOPE
 
-# Only for local testing; remove in production.
+# Only for local testing; remove in production. The DummyAuthenticator
+# accepts any username/password and does not require the user to exist
+# as a system user (the default `PAMAuthenticator` would). `allow_all`
+# additionally drops the explicit allowlist check.
+c.JupyterHub.authenticator_class = "dummy"
 c.Authenticator.allow_all = True
 
 # Custom scope users hold to access the publishing service.
@@ -52,23 +56,36 @@ c.JupyterHub.load_roles = [
         "scopes": ["list:users", "read:users"],
         "services": ["publish"],
     },
-    # Every hub user is allowed to use the publishing service.
-    {
-        "name": "user",
-        "description": "Give all users access to the publishing service.",
-        "scopes": ["self", JUPYTERHUB_SCOPE],
-    },
 ]
 
 # Optional: pre-mint API tokens for demo users when ALICE_TOKEN /
-# BOB_TOKEN are set in the environment. Used by `run_demo.sh`. Both
-# users inherit the `user` role above, so each token already carries
-# the `custom:publishing` scope. Leave the env vars unset in real
-# deployments.
-_demo_tokens = {}
+# BOB_TOKEN are set in the environment. Used by `run_demo.sh`.
+#
+# Wiring detail: `c.JupyterHub.api_tokens` mints the tokens for the
+# named users (and creates the users on first run). We then declare a
+# dedicated `publishing-user` role with the `custom:publishing` scope
+# and explicitly assign it to those users; the default token role
+# (`inherit`) on each token lets the token use whatever scopes its
+# user has, including this one.
+#
+# We deliberately do NOT override the default `user` role here:
+# overriding it loses the built-in user permissions (calling
+# `/hub/api/user` returns empty scopes), which then trips the
+# publish-service's scope check.
+#
+# Leave the env vars unset in real deployments.
+_demo_users = {}
 for _env, _user in (("ALICE_TOKEN", "alice"), ("BOB_TOKEN", "bob")):
     _value = os.environ.get(_env)
     if _value:
-        _demo_tokens[_value] = _user
-if _demo_tokens:
-    c.JupyterHub.api_tokens = _demo_tokens
+        _demo_users[_user] = _value
+if _demo_users:
+    c.JupyterHub.api_tokens = {token: user for user, token in _demo_users.items()}
+    c.JupyterHub.load_roles.append(
+        {
+            "name": "publishing-user",
+            "description": "Holds the custom publishing scope.",
+            "scopes": [JUPYTERHUB_SCOPE],
+            "users": list(_demo_users.keys()),
+        }
+    )

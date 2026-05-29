@@ -3,13 +3,31 @@
 # `demo.py` to walk through alice creating a share that bob can read.
 #
 # Requires `jupyterhub`, `jupyter-publishing` (this repo, installed with
-# `pip install -e .`), and `openssl` on PATH. Logs go to /tmp/.
+# `pip install -e .`), `configurable-http-proxy` (a Node.js package
+# JupyterHub needs to route requests; install with
+# `npm install -g configurable-http-proxy`), and `openssl` on PATH.
+# Logs go to /tmp/.
 #
 # Press Ctrl-C while the demo is running to tear everything down; the
 # trap will stop both background services.
 set -euo pipefail
 
 cd "$(dirname "$0")"
+
+# Preflight: configurable-http-proxy is JupyterHub's default proxy.
+# Without it the Hub aborts during startup with a cryptic error in the
+# log; surface it here instead.
+if ! command -v configurable-http-proxy >/dev/null; then
+    cat >&2 <<'MSG'
+ERROR: `configurable-http-proxy` not found on PATH.
+
+JupyterHub requires it as its default proxy. Install with:
+    npm install -g configurable-http-proxy
+
+(install Node.js first if `npm` is not available)
+MSG
+    exit 1
+fi
 
 HUB_PORT="${HUB_PORT:-8000}"
 PUBLISH_PORT="${PUBLISH_PORT:-9000}"
@@ -76,6 +94,15 @@ for i in $(seq 1 30); do
     fi
     sleep 1
 done
+
+echo "diagnostic: GET /hub/api/user with alice's token"
+curl -sS -o /tmp/jpsvc-alice-user.json -w "  status=%{http_code}\n" \
+    -H "Authorization: token $ALICE_TOKEN" \
+    "http://127.0.0.1:${HUB_PORT}/hub/api/user" || true
+if [[ -s /tmp/jpsvc-alice-user.json ]]; then
+    cat /tmp/jpsvc-alice-user.json
+    echo
+fi
 
 python demo.py "$@"
 demo_status=$?
