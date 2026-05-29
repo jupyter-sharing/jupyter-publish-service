@@ -1,15 +1,56 @@
-# An example with JupyterHub
+# An example with JupyterHub and standalone JupyterLab
 
-Start everything from this directory to find the configuration files.
+This example wires a single publishing service to two authorities:
+- A JupyterHub at `localhost:8000` (authority `hub-local`)
+- A standalone JupyterLab (authority `lab-local`)
 
-Start the (configured) publishing service.
+Either side can share notebooks with the other; user identities are
+namespaced by authority so the same `username` from each side never
+collides.
+
+## 1. Pick a shared service API token
 
 ```
-jupyter publishing --config publishing_config.py
+export PUBLISH_SERVICE_API_TOKEN=$(openssl rand -hex 32)
 ```
 
-Start the (configured) JupyterHub:
+## 2. Start JupyterHub
 
 ```
 jupyterhub --config hub_config.py
 ```
+
+This declares the `custom:publishing` scope, registers `publish` as an
+external service that shares `PUBLISH_SERVICE_API_TOKEN` with the
+publishing service, grants `list:users`/`read:users` to the service
+itself, and grants every user the `custom:publishing` scope.
+
+## 3. Start the publishing service
+
+```
+export JUPYTER_HUB_API_URL=http://localhost:8000/hub/api
+export JUPYTERHUB_API_TOKEN=$PUBLISH_SERVICE_API_TOKEN
+export LAB_JWKS_URL=https://idp.example.com/.well-known/jwks.json
+jupyter publishing --config publishing_config.py
+```
+
+`publishing_config.py` registers both authorities. To run only one,
+drop the other entry from the `authorities` list.
+
+## 4. How clients pick an authority
+
+Clients should send the `X-Jupyter-Authority` header on every request,
+matching one of the configured `name` values (`hub-local` or
+`lab-local`). For Hub-spawned single-user servers, set this in
+`c.Spawner.environment` and have the jupyter-server extension forward
+it. The publishing service falls back to matching the `Host` header
+against each authority's `hosts` list when the header is absent.
+
+## Limitation: per-authority user search
+
+In this version the user-search autocomplete returns users only from
+the *caller's* authority. To add a collaborator from a different
+registered authority (e.g. alice@hub-local sharing with carol@lab-local),
+the sharer must type the qualified `username@authority` directly.
+Federated search across all registered authorities is planned as a
+follow-up.
