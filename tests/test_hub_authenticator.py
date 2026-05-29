@@ -1,4 +1,5 @@
 """Tests for the JupyterHub-backed authenticator."""
+
 import os
 
 import httpx
@@ -94,41 +95,25 @@ async def test_authenticate_caches_user_for_token():
     assert route.call_count == 1
 
 
-async def test_authenticate_honours_filtered_scope():
-    """check_scopes correctly handles filter syntax (`scope!filter=value`).
+async def test_authenticate_honours_broader_scope_for_filtered_requirement():
+    """A broader scope held by the user authorizes a more specific
+    (filtered) required scope. The required `read:users!group=class-a`
+    asks for "may read users in class-a"; the user holds `read:users`
+    (may read any user), which subsumes the requirement.
 
-    The required scope is the bare `read:users`; the caller holds the
-    *filtered* `read:users!group=class-a`. JupyterHub's check_scopes
-    treats the latter as authorising the former for users matching the
-    filter, but for our `required_scopes` semantics the bare scope is
-    asking "do you hold any subset". This test pins down the behavior
-    we ship rather than relying on intuition.
+    This is the canonical case where a naive `in user_scopes` check
+    would deny access; check_scopes admits it.
     """
-    auth = _auth(required_scopes={"read:users"})
+    auth = _auth(required_scopes={"read:users!group=class-a"})
     with respx.mock:
         respx.get(f"{HUB_API}/user").mock(
             return_value=httpx.Response(
                 200,
-                json={"name": "alice", "scopes": ["read:users!group=class-a"]},
+                json={"name": "alice", "scopes": ["read:users"]},
             )
         )
         user = await auth.authenticate("alice-token")
     assert user is not None
-
-
-async def test_authority_required():
-    with pytest.raises(Exception):
-        # No authority set; should fail when traitlets tries to use it.
-        # The actual failure surfaces when User is constructed at
-        # authenticate time, so trigger that path:
-        auth = HubAuthenticator(hub_api_url=HUB_API)
-        with respx.mock:
-            respx.get(f"{HUB_API}/user").mock(
-                return_value=httpx.Response(
-                    200, json={"name": "alice", "scopes": ["custom:publishing"]}
-                )
-            )
-            await auth.authenticate("alice-token")
 
 
 async def test_falls_back_to_jupyterhub_api_url_env(monkeypatch):

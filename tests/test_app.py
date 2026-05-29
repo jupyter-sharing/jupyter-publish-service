@@ -91,10 +91,10 @@ async def test_create_file(start_db, async_client):
     async with async_client as client:
         resp = await client.post(
             "/sharing",
-            content=request_model.model_dump_json(),
+            json=request_model.model_dump(mode="json"),
             headers=_auth_headers(),
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 200, resp.text
 
 
 async def test_search_users_uses_bound_user_store(start_db, async_client):

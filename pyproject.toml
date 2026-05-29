@@ -31,6 +31,7 @@ dependencies = [
     "traitlets",
     "sqlmodel",
     "aiosqlite",
+    "greenlet",
     "jwcrypto",
     "httpx",
     "aiocache"

@@ -15,7 +15,7 @@ from .base import BaseStorageManager
 
 class SQLStorageManager(BaseStorageManager):
 
-    database_path = Unicode(default_value="sqlite+aiosqlite:///database.db")
+    database_path = Unicode(default_value="sqlite+aiosqlite:///database.db").tag(config=True)
     _async_engine = Instance(AsyncEngine, allow_none=True)
     echo = Bool(default_value=False, help="Echo SQL queries for debugging.").tag(config=True)
 
