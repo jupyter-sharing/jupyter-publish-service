@@ -8,13 +8,39 @@ Either side can share notebooks with the other; user identities are
 namespaced by authority so the same `username` from each side never
 collides.
 
-## 1. Pick a shared service API token
+## Quick start: run the two-user demo
+
+`run_demo.sh` boots both services locally, mints API tokens for two
+hub users (alice and bob), and walks through alice creating a
+notebook share that bob can read.
+
+```
+./run_demo.sh
+```
+
+The script prints each step. Logs go to `/tmp/jpsvc-hub.log` and
+`/tmp/jpsvc-publish.log`. Press Ctrl-C while it's running and both
+services are torn down by the trap.
+
+What the demo exercises:
+
+1. alice creates a share with bob as a collaborator.
+2. bob lists his shares and sees the notebook alice just shared.
+3. bob fetches the notebook contents and the collaborator list.
+4. alice searches users via `HubUserStore` (the autocomplete used
+   by JupyterLab's sharing dialog).
+
+If you want to inspect the moving parts manually instead, read on.
+
+## Manual setup
+
+### 1. Pick a shared service API token
 
 ```
 export PUBLISH_SERVICE_API_TOKEN=$(openssl rand -hex 32)
 ```
 
-## 2. Start JupyterHub
+### 2. Start JupyterHub
 
 ```
 jupyterhub --config hub_config.py
@@ -25,7 +51,7 @@ external service that shares `PUBLISH_SERVICE_API_TOKEN` with the
 publishing service, grants `list:users`/`read:users` to the service
 itself, and grants every user the `custom:publishing` scope.
 
-## 3. Start the publishing service
+### 3. Start the publishing service
 
 ```
 export JUPYTER_HUB_API_URL=http://localhost:8000/hub/api
@@ -37,7 +63,7 @@ jupyter publishing --config publishing_config.py
 `publishing_config.py` registers both authorities. To run only one,
 drop the other entry from the `authorities` list.
 
-## 4. How clients pick an authority
+### 4. How clients pick an authority
 
 Clients should send the `X-Jupyter-Authority` header on every request,
 matching one of the configured `name` values (`hub-local` or

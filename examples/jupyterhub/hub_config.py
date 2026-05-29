@@ -59,3 +59,16 @@ c.JupyterHub.load_roles = [
         "scopes": ["self", JUPYTERHUB_SCOPE],
     },
 ]
+
+# Optional: pre-mint API tokens for demo users when ALICE_TOKEN /
+# BOB_TOKEN are set in the environment. Used by `run_demo.sh`. Both
+# users inherit the `user` role above, so each token already carries
+# the `custom:publishing` scope. Leave the env vars unset in real
+# deployments.
+_demo_tokens = {}
+for _env, _user in (("ALICE_TOKEN", "alice"), ("BOB_TOKEN", "bob")):
+    _value = os.environ.get(_env)
+    if _value:
+        _demo_tokens[_value] = _user
+if _demo_tokens:
+    c.JupyterHub.api_tokens = _demo_tokens
