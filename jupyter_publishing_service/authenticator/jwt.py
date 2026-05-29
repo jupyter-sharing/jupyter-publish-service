@@ -1,9 +1,12 @@
+from typing import Optional
+
 import jwcrypto.jws as jws
 import jwcrypto.jwt as jwt
+from fastapi import HTTPException
 from httpx import AsyncClient, create_ssl_context
 from jwcrypto.common import base64url_decode, json_decode
 from jwcrypto.jwk import JWK
-from traitlets import Dict
+from traitlets import Dict, Unicode
 from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service import constants
@@ -15,6 +18,12 @@ from jupyter_publishing_service.traits import UnicodeFromEnv
 class JWTAuthenticator(LoggingConfigurable):
 
     _alg = "RS256"
+
+    authority = Unicode(
+        config=True,
+        help="The authority value stamped onto every authenticated User. "
+        "Normally inherited from JupyterPublishingService.authority.",
+    )
 
     public_key_url = UnicodeFromEnv(
         name=constants.JWKS_URI,
@@ -83,8 +92,7 @@ class JWTAuthenticator(LoggingConfigurable):
             self.log.error(f"failed to decode jwt using public key, public_key={public_key}, e={e}")
             return -1
 
-    @staticmethod
-    def get_current_user(jwt_token: str, public_key: JWK) -> User:
+    def _current_user(self, jwt_token: str, public_key: JWK) -> User:
         decoded_jwt = jwt.JWT(
             jwt=jwt_token,
             key=public_key,
@@ -93,12 +101,12 @@ class JWTAuthenticator(LoggingConfigurable):
             },
         )
         data = json_decode(decoded_jwt.claims)
-        return User(username=data["email"])
+        return User(authority=self.authority, username=data["email"])
 
-    async def authenticate(self, token: str) -> User:
+    async def authenticate(self, token: str) -> Optional[User]:
         public_key = await self.get_public_key_by_kid(token)
         try:
-            return self.get_current_user(token, public_key)
+            return self._current_user(token, public_key)
         except jws.InvalidJWSSignature as e:
             self.log.error(f"invalid public key: error {e}")
         except jwt.JWTMissingClaim as e:
@@ -111,7 +119,7 @@ class JWTAuthenticator(LoggingConfigurable):
             self.log.error(f"invalid token: {e}")
         except Exception as e:
             self.log.error(f"token validation failed: {e}")
-        return {}
+        return None
 
 
 AuthenticatorABC.register(JWTAuthenticator)

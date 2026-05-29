@@ -1,23 +1,26 @@
 from abc import ABCMeta, abstractmethod
+from typing import Optional
 
 from jupyter_publishing_service.models.sql import User
 
 
 class AuthenticatorABC(metaclass=ABCMeta):
+    """Validate a bearer token and return the user it identifies.
+
+    Implementations are bound to a single `authority` (set by the service
+    at construction time) and must stamp it onto every User they return,
+    so that downstream code can distinguish users with the same `username`
+    coming from different Jupyter deployments.
+    """
+
     @abstractmethod
-    async def authenticate(self, token: str) -> User:
+    async def authenticate(self, token: str) -> Optional[User]:
         """
-        Authenticate a user with login data
+        Validate the bearer token and return the authenticated user.
 
-        This must be non-blocking co-routine
-
-        Must return username on successful authentication,
-        and return None on failed authentication
-
-        Args:
-            data (dict): Login data
-
-        Returns:
-            user (dict or None): Must return a dict with key 'name' with a unique value. Can include other fields
+        Must return a `User` with `authority` and `username` populated on
+        success, or `None` on failure (callers translate `None` into 401).
+        Implementations should raise `fastapi.HTTPException` for definitive
+        rejections (e.g. token valid but missing required scope → 403).
         """
         raise NotImplementedError

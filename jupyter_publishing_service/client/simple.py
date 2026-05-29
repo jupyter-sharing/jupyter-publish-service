@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from httpx import AsyncClient, RequestError
-from traitlets import Unicode
+from traitlets import Dict, Unicode
 from traitlets.config import LoggingConfigurable
 
 from jupyter_publishing_service.models.rest import (
@@ -29,24 +29,29 @@ class AsyncPublishingClient(LoggingConfigurable):
     service_url = Unicode(default_value="http://localhost:9000").tag(config=True)
     api_token = Unicode(allow_none=True).tag(config=True)
     key_id = Unicode(allow_none=True).tag(config=True)
+    extra_headers = Dict(
+        default_value={},
+        help="Additional headers to send with every request. Typically used to "
+        "include X-Jupyter-Authority so the publishing service can route the "
+        "request to the right authenticator in multi-authority deployments.",
+    ).tag(config=True)
 
     @property
     def headers(self) -> dict:
+        h: dict = {**self.extra_headers}
         if self.api_token:
-            headers = {"Authorization": f"Bearer {self.api_token}"}
+            h["Authorization"] = f"Bearer {self.api_token}"
             if self.key_id:
-                headers["kid"] = self.key_id
-            return headers
-        return {}
+                h["kid"] = self.key_id
+        return h
 
     def token_is_valid(self) -> bool:
-        if self.api_token is None:
-            return False
-        return True
+        return self.api_token is not None
 
     async def fetch_token(self) -> str:
         if self.api_token is None:
             raise RequestError("No valid token.")
+        return self.api_token
 
     async def service_status(self) -> ServiceStatusResponse:
         url = self.service_url + "/"
@@ -76,18 +81,22 @@ class AsyncPublishingClient(LoggingConfigurable):
 
     @check_token
     async def add_file(self, request: SharedFileRequestModel) -> SharedFileResponseModel:
-        url = self.service_url + f"/sharing"
+        url = self.service_url + "/sharing"
         async with AsyncClient(verify=True) as client:
-            response = await client.post(url, headers=self.headers, json=request.model_dump())
+            response = await client.post(
+                url, headers=self.headers, json=request.model_dump(mode="json")
+            )
             if response.is_client_error:
-                raise Exception()
+                raise RequestError(f"add_file failed: {response.status_code} {response.text}")
             return SharedFileResponseModel.model_validate(response.json())
 
     @check_token
     async def update_file(self, request: SharedFileRequestModel) -> SharedFileResponseModel:
         url = self.service_url + f"/sharing/{request.metadata.id}"
         async with AsyncClient(verify=True) as client:
-            response = await client.post(url, headers=self.headers, json=request.model_dump_json())
+            response = await client.patch(
+                url, headers=self.headers, json=request.model_dump(mode="json")
+            )
             return SharedFileResponseModel.model_validate(response.json())
 
     @check_token
@@ -99,15 +108,10 @@ class AsyncPublishingClient(LoggingConfigurable):
     @check_token
     async def search_users(self, substring: Optional[str] = None) -> List[User]:
         url = self.service_url + "/sharing/users"
-        if substring:
-            url += "?substring={substring}"
+        params = {"substring": substring} if substring else None
         async with AsyncClient(verify=True) as client:
-            response = await client.get(url, headers=self.headers)
-            collaborators = []
-            for item in response.json():
-                collab = User.model_validate(item)
-                collaborators.append(collab)
-            return collaborators
+            response = await client.get(url, headers=self.headers, params=params)
+            return [User.model_validate(item) for item in response.json()]
 
 
 ClientABC.register(AsyncPublishingClient)

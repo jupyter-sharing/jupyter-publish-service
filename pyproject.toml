@@ -24,6 +24,7 @@ classifiers = [
 requires-python = ">=3.7"
 dependencies = [
     "jupyter_core",
+    "jupyterhub",
     "fastapi",
     "uvicorn",
     "pydantic",
@@ -38,7 +39,8 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=6.0",
-    "anyio"
+    "anyio",
+    "respx"
 ]
 
 [project.scripts]
