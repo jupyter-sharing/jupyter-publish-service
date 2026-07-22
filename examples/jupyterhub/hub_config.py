@@ -23,7 +23,14 @@ This wires JupyterHub to the publishing service in three ways:
 """
 import os
 
-from jupyter_publishing_service.constants import JUPYTERHUB_SCOPE
+try:
+    from jupyter_publishing_service.constants import JUPYTERHUB_SCOPE
+except ModuleNotFoundError:
+    # The stock `jupyterhub/jupyterhub` image (used by docker-compose.yml and
+    # z2jh on kind) does not have this package installed, and it should not
+    # need to just to read one constant. Keep this value in sync with
+    # jupyter_publishing_service.constants.JUPYTERHUB_SCOPE.
+    JUPYTERHUB_SCOPE = "custom:publishing"
 
 # Only for local testing; remove in production. The DummyAuthenticator
 # accepts any username/password and does not require the user to exist

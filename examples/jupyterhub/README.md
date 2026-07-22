@@ -1,6 +1,7 @@
 # An example with JupyterHub and standalone JupyterLab
 
 This example wires a single publishing service to two authorities:
+
 - A JupyterHub at `localhost:8000` (authority `hub-local`)
 - A standalone JupyterLab (authority `lab-local`)
 
@@ -15,8 +16,11 @@ hub users (alice and bob), and walks through alice creating a
 notebook share that bob can read.
 
 Prerequisites:
-- `jupyter-publish-service` installed (`pip install -e .` from the
-  repo root) — pulls in JupyterHub and `aiosqlite`/`greenlet`/etc.
+
+- `jupyter-publish-service` installed with the JupyterHub extra
+  (`pip install -e ".[jupyterhub]"` from the repo root) — the extra pulls
+  in JupyterHub, which the `HubAuthenticator` needs; the base install
+  brings `aiosqlite`/`greenlet`/etc.
 - [`configurable-http-proxy`](https://github.com/jupyterhub/configurable-http-proxy):
   JupyterHub's default proxy, distributed as a Node.js package.
   Install with `npm install -g configurable-http-proxy` (install
@@ -83,10 +87,110 @@ matching one of the configured `name` values (`hub-local` or
 it. The publishing service falls back to matching the `Host` header
 against each authority's `hosts` list when the header is absent.
 
+## Kubernetes with kind
+
+Two ways to run this on a local [kind](https://kind.sigs.k8s.io/) cluster.
+Both deploy the publishing service as a **separate Deployment**
+(`kind/publishing-service.yaml`) that talks to the Hub at
+`http://hub:8081/hub/api`; they differ only in how the Hub itself runs:
+
+- **Single-pod Hub** (`kind/hub-deployment.yaml`) — one stock
+  `jupyterhub/jupyterhub` pod with the proxy running in-process. Recommended
+  for kind; this is the path validated end-to-end.
+- **z2jh Helm chart** (`kind/z2jh-values.yaml`) — the production-shaped
+  Zero-to-JupyterHub deployment (Hub, proxy, and pre-puller as separate pods).
+
+Prerequisites: `kind`, `kubectl`, `helm` (for the z2jh path), Docker, `openssl`.
+
+### Common setup (both paths)
+
+```
+# 1. Cluster.
+kind create cluster --name jpsvc
+
+# 2. Build the publishing-service image and load it into the cluster.
+#    (Build context is the repo root.)
+docker build -f examples/jupyterhub/Dockerfile -t jupyter-publishing:demo ../..
+kind load docker-image jupyter-publishing:demo --name jpsvc
+
+# 3. Namespace + the shared secret referenced by both the Hub and the service.
+#    Three keys: the service-owned token plus a pre-minted token per demo user.
+kubectl create namespace jhub
+kubectl create secret generic publishing-shared-token -n jhub \
+    --from-literal=service-token="$(openssl rand -hex 32)" \
+    --from-literal=alice-token="$(openssl rand -hex 32)" \
+    --from-literal=bob-token="$(openssl rand -hex 32)"
+```
+
+### Path A: single-pod Hub (recommended)
+
+```
+# Load the stock Hub image (bundles configurable-http-proxy).
+docker pull jupyterhub/jupyterhub:5
+kind load docker-image jupyterhub/jupyterhub:5 --name jpsvc
+
+kubectl apply -n jhub -f kind/hub-deployment.yaml
+kubectl apply -n jhub -f kind/publishing-service.yaml
+kubectl rollout status -n jhub deploy/hub deploy/publish
+```
+
+The Hub pod holds its state in the pod (ephemeral): a restart re-mints the
+demo tokens from the Secret, so nothing breaks. Add a PVC if you want it to
+survive restarts.
+
+### Path B: z2jh Helm chart
+
+```
+helm repo add jupyterhub https://hub.jupyter.org/helm-chart/
+helm repo update
+helm upgrade --install hub jupyterhub/jupyterhub \
+    --namespace jhub --values kind/z2jh-values.yaml --timeout 10m
+kubectl apply -n jhub -f kind/publishing-service.yaml
+kubectl rollout status -n jhub deploy/hub deploy/publish
+```
+
+Caveats (why Path A is recommended for kind):
+
+- z2jh runs the Hub, proxy, and image pre-puller as separate pods. On a
+  small kind node the Hub's event loop can starve, showing up as
+  `api_request to the proxy failed ... status code 599` and
+  `Event loop was unresponsive`. Give each node **≥3 CPU**.
+- The chart pulls `k8s-hub`/`configurable-http-proxy` from `quay.io`. If
+  kind can't reach it (`ErrImagePull`), `docker pull` the exact images and
+  tags the chart wants, `kind load` them, and point `hub.image`/`proxy.chp.image`
+  at those names.
+- This path was **not** validated end-to-end here; the values file is
+  correct but the multi-pod runtime is what makes it finicky on kind.
+
+If you previously ran Path B and are switching to Path A, run
+`helm uninstall hub -n jhub` first so its `hub` Service does not collide with
+the single-pod one.
+
+### Verify (both paths)
+
+```
+# Optional: health check via port-forward.
+kubectl port-forward -n jhub svc/publish 9000:9000 &
+curl -s localhost:9000/ ; echo
+
+# Run the two-user demo from inside the publish pod (env is already wired).
+kubectl exec -n jhub deploy/publish -- python3 /src/examples/jupyterhub/demo.py
+```
+
+Success = the demo prints steps 1–4 and ends with `--- done ---`.
+
+Tear down with `kind delete cluster --name jpsvc`.
+
+**Scope gotcha:** the demo users receive `custom:publishing` via a dedicated
+`publishing-user` role assigned to alice/bob. Do **not** instead grant it by
+overriding the default `user` role — that drops the built-in user scopes, so
+`/hub/api/user` returns empty scopes and the publishing service rejects the
+caller with `403 Caller missing required scope(s): ['custom:publishing']`.
+
 ## Limitation: per-authority user search
 
 In this version the user-search autocomplete returns users only from
-the *caller's* authority. To add a collaborator from a different
+the _caller's_ authority. To add a collaborator from a different
 registered authority (e.g. alice@hub-local sharing with carol@lab-local),
 the sharer must type the qualified `username@authority` directly.
 Federated search across all registered authorities is planned as a

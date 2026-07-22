@@ -1,0 +1,177 @@
+# Minimal, z2jh-FREE JupyterHub for the kind demo.
+#
+# Why this exists: z2jh runs the Hub, the proxy (configurable-http-proxy),
+# and an image pre-puller as separate pods. On a small kind node that
+# multi-pod setup starves the Hub's event loop (symptom: "api_request to the
+# proxy failed ... status code 599" + "Event loop was unresponsive"). For a
+# two-user API demo that never spawns a single-user server, a single stock
+# `jupyterhub/jupyterhub` pod running CHP IN-PROCESS is all you need.
+#
+# This mirrors examples/jupyterhub/hub_config.py, adding only the two things a
+# split-pod k8s deployment requires: binding the Hub API on all interfaces and
+# advertising the `hub` Service name so the separate publishing-service pod can
+# reach http://hub:8081/hub/api.
+#
+# Apply into the same namespace as publishing-service.yaml:
+#     kubectl apply -n jhub -f hub-deployment.yaml
+#
+# Prereqs (see README):
+#   - `publishing-shared-token` Secret already created in the namespace.
+#   - The hub image loaded into kind:
+#       docker pull jupyterhub/jupyterhub:5
+#       kind load docker-image jupyterhub/jupyterhub:5 --name jpsvc
+#   - If you previously ran z2jh: `helm uninstall hub -n jhub` first, so its
+#     `hub` Service does not collide with the one below.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hub-config
+  labels:
+    app: hub
+data:
+  hub_config.py: |
+    import os
+
+    # Keep in sync with jupyter_publishing_service.constants.JUPYTERHUB_SCOPE.
+    SCOPE = "custom:publishing"
+
+    # --- local-testing auth (DummyAuthenticator accepts any user) -----------
+    c.JupyterHub.authenticator_class = "dummy"
+    c.Authenticator.allow_all = True
+
+    # --- k8s networking: make the Hub reachable from the publish pod --------
+    # The Hub API defaults to binding 127.0.0.1:8081 (localhost only). Bind all
+    # interfaces and advertise the `hub` Service name so a separate pod can
+    # call http://hub:8081/hub/api.
+    c.JupyterHub.hub_ip = "0.0.0.0"
+    c.JupyterHub.hub_connect_ip = "hub"
+    # Public proxy bind (reachable via `kubectl port-forward svc/hub 8000`).
+    c.JupyterHub.ip = "0.0.0.0"
+    c.JupyterHub.port = 8000
+
+    # --- publishing-service wiring (identical to hub_config.py) --------------
+    c.JupyterHub.custom_scopes = {
+        SCOPE: {"description": "Access the Jupyter publishing service."},
+    }
+    # External service: the Hub only shares a token; it does not spawn/proxy it.
+    c.JupyterHub.services = [
+        {"name": "publish", "api_token": os.environ["PUBLISH_SERVICE_API_TOKEN"]},
+    ]
+    c.JupyterHub.load_roles = [
+        {
+            "name": "publish-service-role",
+            "description": "Lets the publishing service enumerate hub users.",
+            "scopes": ["list:users", "read:users"],
+            "services": ["publish"],
+        },
+        # Holds the custom publishing scope. A DEDICATED role assigned to the
+        # demo users — do NOT instead override the default `user` role: that
+        # drops the built-in user permissions and /hub/api/user comes back with
+        # empty scopes, which trips the publishing service's scope check (403
+        # "Caller missing required scope(s): ['custom:publishing']").
+        {
+            "name": "publishing-user",
+            "description": "Holds the custom publishing scope.",
+            "scopes": [SCOPE],
+            "users": ["alice", "bob"],
+        },
+    ]
+    # Pre-mint tokens so demo.py can run headless. The token inherits its
+    # user's scopes, so alice/bob tokens carry custom:publishing via the role
+    # assigned above.
+    c.JupyterHub.api_tokens = {
+        os.environ["ALICE_TOKEN"]: "alice",
+        os.environ["BOB_TOKEN"]: "bob",
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub
+  labels:
+    app: hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub
+  strategy:
+    type: Recreate # single pod owns the sqlite state file; never run two
+  template:
+    metadata:
+      labels:
+        app: hub
+    spec:
+      containers:
+        - name: hub
+          image: jupyterhub/jupyterhub:5 # bundles configurable-http-proxy
+          imagePullPolicy: IfNotPresent # use the kind-loaded local image
+          command: ["jupyterhub", "-f", "/srv/jupyterhub/hub_config.py"]
+          env:
+            - name: PUBLISH_SERVICE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-shared-token
+                  key: service-token
+            - name: ALICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-shared-token
+                  key: alice-token
+            - name: BOB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-shared-token
+                  key: bob-token
+          ports:
+            - containerPort: 8000
+              name: web # public proxy (browser)
+            - containerPort: 8081
+              name: hub-api # Hub REST API (publish pod calls this)
+          volumeMounts:
+            - name: config
+              mountPath: /srv/jupyterhub/hub_config.py
+              subPath: hub_config.py
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /hub/api # returns 200 {version} without auth
+              port: hub-api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /hub/api
+              port: hub-api
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: config
+          configMap:
+            name: hub-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub
+  labels:
+    app: hub
+spec:
+  selector:
+    app: hub
+  ports:
+    - name: web
+      port: 8000
+      targetPort: web
+    - name: hub-api
+      port: 8081
+      targetPort: hub-api
+  type: ClusterIP

@@ -2,8 +2,9 @@
 # Boots JupyterHub and the publishing service locally, then runs
 # `demo.py` to walk through alice creating a share that bob can read.
 #
-# Requires `jupyterhub`, `jupyter-publishing` (this repo, installed with
-# `pip install -e .`), `configurable-http-proxy` (a Node.js package
+# Requires `jupyter-publishing` (this repo, installed with
+# `pip install -e ".[jupyterhub]"` — the extra pulls in JupyterHub),
+# `configurable-http-proxy` (a Node.js package
 # JupyterHub needs to route requests; install with
 # `npm install -g configurable-http-proxy`), and `openssl` on PATH.
 # Logs go to /tmp/.
