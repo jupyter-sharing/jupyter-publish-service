@@ -1,0 +1,86 @@
+# The publishing service running IN-CLUSTER, alongside (but separate from)
+# the z2jh Hub. Apply into the same namespace as the Helm release so the
+# in-cluster Hub DNS name `hub` resolves:
+#
+#     kubectl apply -n jhub -f publishing-service.yaml
+#
+# The image `jupyter-publishing:demo` is built from examples/jupyterhub/Dockerfile
+# and loaded into kind (`kind load docker-image jupyter-publishing:demo`).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: publish
+  labels:
+    app: publish
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: publish
+  template:
+    metadata:
+      labels:
+        app: publish
+    spec:
+      containers:
+        - name: publish
+          image: kind-registry.test:5000/jupyter-publishing:demo
+          imagePullPolicy: IfNotPresent # use the kind-loaded local image
+          # Uses the image's default command (binds 0.0.0.0:9000).
+          env:
+            # z2jh serves the Hub REST API on the in-cluster `hub` service:8081.
+            - name: JUPYTER_HUB_API_URL
+              value: http://hub:8081/hub/api
+            - name: JUPYTERHUB_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-shared-token
+                  key: service-token
+            - name: LAB_JWKS_URL
+              value: https://idp.example.com/.well-known/jwks.json
+            # Present so `kubectl exec deploy/publish -- python3 demo.py` works.
+            - name: PUBLISH_URL
+              value: http://localhost:9000
+            - name: DEMO_AUTHORITY
+              value: hub-local
+            - name: ALICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-shared-token
+                  key: alice-token
+            - name: BOB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: publishing-shared-token
+                  key: bob-token
+          ports:
+            - containerPort: 9000
+              name: web
+          readinessProbe:
+            httpGet:
+              path: /
+              port: web
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: web
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: publish
+  labels:
+    app: publish
+spec:
+  selector:
+    app: publish
+  ports:
+    - name: web
+      port: 9000
+      targetPort: web
+  type: ClusterIP

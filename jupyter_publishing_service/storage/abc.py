@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List
 
 from ..models.rest import SharedFileRequestModel, SharedFileResponseModel
-from ..models.sql import Collaborator
+from ..models.sql import User
 
 
 class StorageManagerABC(ABC):
@@ -11,6 +11,10 @@ class StorageManagerABC(ABC):
     could be stored in various local/remote locations. The
     job of the storage manager is to know where to find this data
     and optimize queries/requests based on these sources.
+
+    User search is *not* a storage-manager concern; it lives on the
+    AuthorityRegistry (per-authority user store) because the source of
+    candidate users is authority-specific.
     """
 
     @abstractmethod
@@ -18,14 +22,11 @@ class StorageManagerABC(ABC):
         raise NotImplementedError("Must be implemented in a subclass.")
 
     @abstractmethod
-    async def start(
-        self,
-        user,
-    ):
+    async def start(self):
         raise NotImplementedError("Must be implemented in a subclass.")
 
     @abstractmethod
-    async def authorize(self, user: Collaborator, file_id: str):
+    async def authorize(self, user: User, action: str, file_id: str):
         raise NotImplementedError("Must be implemented in a subclass.")
 
     @abstractmethod
@@ -47,9 +48,5 @@ class StorageManagerABC(ABC):
         raise NotImplementedError("Must be implemented in a subclass.")
 
     @abstractmethod
-    async def list(self, user_id: str) -> List[SharedFileResponseModel]:
-        raise NotImplementedError("Must be implemented in a subclass.")
-
-    @abstractmethod
-    async def search_users(self, substring: Optional[str]) -> List[Collaborator]:
+    async def list(self, user: User) -> List[SharedFileResponseModel]:
         raise NotImplementedError("Must be implemented in a subclass.")

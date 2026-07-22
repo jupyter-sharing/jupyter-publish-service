@@ -6,7 +6,7 @@ from jupyter_publishing_service.models.rest import (
     SharedFileRequestModel,
     SharedFileResponseModel,
 )
-from jupyter_publishing_service.models.sql import Collaborator
+from jupyter_publishing_service.models.sql import User
 
 
 class ClientABC(ABC):
@@ -37,5 +37,5 @@ class ClientABC(ABC):
         ...
 
     @abstractmethod
-    async def search_users(substring: Optional[str] = None) -> List[Collaborator]:
+    async def search_users(substring: Optional[str] = None) -> List[User]:
         ...

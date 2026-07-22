@@ -6,51 +6,47 @@ from fastapi.security import HTTPBearer
 from starlette.exceptions import HTTPException
 
 from ._version import __version__
-from .authorizer.service import require_read_permissions, require_read_write_permissions
 from .models.rest import (
-    Collaborator,
     ServiceStatusResponse,
     SharedFileRequestModel,
     SharedFileResponseModel,
 )
-from .models.sql import Collaborator
+from .models.sql import User
 from .storage.base import BaseStorageManager
 
 httpBearer = HTTPBearer()
 
 router = APIRouter()
 
+HTTP_VERB_TO_AUTH = {"get": "READ", "post": "WRITE", "patch": "WRITE", "delete": "WRITE"}
 
-async def authorize(request: Request):
-    user = request.state.user
-    permissions = request.state.permissions
+
+async def authenticate(request: Request) -> User:
+    """Resolve the request's authority, validate the bearer token, and
+    attach the resulting User and bound authority to request.state."""
+    credentials = await httpBearer(request)
+    if credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=403, detail="Unsupported authentication method")
+    bound = router.app.authority_registry.resolve(request)
+    user = await bound.authenticator.authenticate(credentials.credentials)
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    request.state.user = user  # type: ignore[attr-defined]
+    request.state.authority = bound  # type: ignore[attr-defined]
+    return user
+
+
+async def authorize(request: Request, file_id: str):
+    user: User = request.state.user
     storage_manager: BaseStorageManager = router.app.storage_manager
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    action = request.method.lower()
-    data = await request.json() if action in ["post", "put"] else {}
-    resource_name = request.url.path.strip("/").split("/")[1]
-    file_id = data.get("id") if action in ["post", "put"] else resource_name
-    data["permissions"] = permissions
-    data["file_id"] = file_id
-    allowed = await storage_manager.authorization_store.authorize(user, data)
+    verb = request.method.lower()
+    action = HTTP_VERB_TO_AUTH[verb]
+    allowed = await storage_manager.authorization_store.authorize(user, action, file_id)
     if not allowed:
         raise HTTPException(status_code=403, detail="Not authorized")
     return True
-
-
-async def authenticate(request: Request) -> dict:
-    """Token based authenticated"""
-    credentials = await httpBearer(request)
-    authenticator = router.app.authenticator
-    if credentials.scheme != "Bearer":
-        raise HTTPException(status_code=403, detail="Unsupported authentication method")
-    data = {"token": credentials.credentials}
-    user = await authenticator.authenticate(data)
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    request.state.user = user  # type: ignore
-    return user
 
 
 @asynccontextmanager
@@ -71,28 +67,22 @@ async def service_status():
     dependencies=[Depends(authenticate)],
     response_model=List[SharedFileResponseModel],
 )
-async def list_files(
-    request: Request,
-):
+async def list_files(request: Request):
     storage_manager: BaseStorageManager = router.app.storage_manager
-    user = request.state.user
-    return await storage_manager.list(user["name"])
+    return await storage_manager.list(request.state.user)
 
 
 @router.get(
     "/sharing/users",
-    dependencies=[
-        Depends(authenticate),
-    ],
+    dependencies=[Depends(authenticate)],
 )
-async def search_users(substring: Optional[str] = None) -> List[Collaborator]:
-    storage_manager: BaseStorageManager = router.app.storage_manager
-    return await storage_manager.search_users(substring)
+async def search_users(request: Request, substring: Optional[str] = None) -> List[User]:
+    return await request.state.authority.user_store.search_users(substring)
 
 
 @router.get(
     "/sharing/{file_id}",
-    dependencies=[Depends(authenticate), Depends(require_read_permissions), Depends(authorize)],
+    dependencies=[Depends(authenticate), Depends(authorize)],
     response_model=SharedFileResponseModel,
 )
 async def get_file(
@@ -107,6 +97,7 @@ async def get_file(
 
 @router.post(
     "/sharing",
+    dependencies=[Depends(authenticate)],
     response_model=SharedFileResponseModel,
 )
 async def add_file(body: SharedFileRequestModel) -> SharedFileResponseModel:
@@ -118,7 +109,6 @@ async def add_file(body: SharedFileRequestModel) -> SharedFileResponseModel:
     "/sharing/{file_id}",
     dependencies=[
         Depends(authenticate),
-        Depends(require_read_write_permissions),
         Depends(authorize),
     ],
     response_model=SharedFileResponseModel,
@@ -132,7 +122,6 @@ async def update_file(file_id: str, body: SharedFileRequestModel) -> SharedFileR
     "/sharing/{file_id}",
     dependencies=[
         Depends(authenticate),
-        Depends(require_read_write_permissions),
         Depends(authorize),
     ],
 )

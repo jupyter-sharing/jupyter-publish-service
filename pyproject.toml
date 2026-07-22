@@ -30,15 +30,26 @@ dependencies = [
     "traitlets",
     "sqlmodel",
     "aiosqlite",
+    "greenlet",
     "jwcrypto",
     "httpx",
     "aiocache"
 ]
 
 [project.optional-dependencies]
+# JupyterHub is only needed when an authority uses HubAuthenticator: it
+# provides `check_scopes` (jupyter_publishing_service/authenticator/hub.py).
+# The authenticator module is imported lazily by the AuthorityRegistry only
+# when such an authority is configured, so JWT-only / standalone-Lab
+# deployments do not need this extra. Install it with:
+#     pip install "jupyter_publishing_service[jupyterhub]"
+jupyterhub = ["jupyterhub"]
 test = [
     "pytest>=6.0",
-    "anyio"
+    "anyio",
+    "respx",
+    # test_hub_authenticator.py imports HubAuthenticator, which needs jupyterhub.
+    "jupyterhub",
 ]
 
 [project.scripts]

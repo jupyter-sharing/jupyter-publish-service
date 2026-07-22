@@ -11,16 +11,14 @@ from jupyter_publishing_service.file.abc import FileStoreABC
 from jupyter_publishing_service.file.sql import SQLFileStore
 from jupyter_publishing_service.metadata.abc import MetadataStoreABC
 from jupyter_publishing_service.metadata.sql import SQLMetadataStore
-from jupyter_publishing_service.user.abc import UserStoreABC
-from jupyter_publishing_service.user.sql import SQLUserStore
 
 from ..models.rest import SharedFileRequestModel, SharedFileResponseModel
 from ..models.sql import (
     Collaborator,
-    CollaboratorRole,
     JupyterContentsModel,
     Role,
     SharedFileMetadata,
+    User,
 )
 from .abc import StorageManagerABC
 
@@ -51,12 +49,6 @@ class BaseStorageManager(LoggingConfigurable):
     def _default_file_store_class(self):
         return SQLFileStore
 
-    user_store_class = Type(klass=UserStoreABC).tag(config=True)
-
-    @default("user_store_class")
-    def _default_user_store_class(self):
-        return SQLUserStore
-
     authorization_store: AuthorizerABC = Instance(
         klass="jupyter_publishing_service.authorizer.abc.AuthorizerABC",
         allow_none=True,
@@ -77,37 +69,31 @@ class BaseStorageManager(LoggingConfigurable):
         allow_none=True,
     )
 
-    user_store: UserStoreABC = Instance(
-        klass="jupyter_publishing_service.user.abc.UserStoreABC",
-        allow_none=True,
-    )
-
     def initialize(self):
         self.authorization_store = self.authorization_store_class(parent=self, log=self.log)
         self.metadata_store = self.metadata_store_class(parent=self, log=self.log)
         self.collaborator_store = self.collaborator_store_class(parent=self, log=self.log)
         self.file_store = self.file_store_class(parent=self, log=self.log)
-        self.user_store = self.user_store_class(parent=self, log=self.log)
 
     async def start(self):
         # Don't do anything here. Subclasses can use this to initialize a e.g. database.
         ...
 
-    async def authorize(self, user: Collaborator, file_id: str) -> bool:
-        return await self.authorization_store.authorize(user, file_id)
+    async def authorize(self, user: User, action: str, file_id: str) -> bool:
+        return await self.authorization_store.authorize(user, action, file_id)
 
     async def get(
         self, file_id: str, collaborators: bool = False, contents: bool = False
     ) -> SharedFileResponseModel:
         metadata: SharedFileMetadata = await self.metadata_store.get(file_id)
-        collaborator_roles = None
+        collaborator_list = None
         if collaborators:
-            collaborator_roles: List[CollaboratorRole] = await self.collaborator_store.get(file_id)
+            collaborator_list: List[Collaborator] = await self.collaborator_store.get(file_id)
         file = None
         if contents:
             file: JupyterContentsModel = await self.file_store.get(file_id=file_id)
         return SharedFileResponseModel(
-            metadata=metadata, collaborator_roles=collaborator_roles, contents=file
+            metadata=metadata, collaborator=collaborator_list, contents=file
         )
 
     async def add(self, request_model: SharedFileRequestModel) -> SharedFileResponseModel:
@@ -117,16 +103,16 @@ class BaseStorageManager(LoggingConfigurable):
         Returns a SharedFileResponse without contents and collaborators.
         """
         metadata = await self.metadata_store.add(request_model.metadata)
-        if request_model.collaborators:
-            for collaborator in request_model.collaborators:
+        if request_model.users:
+            for user in request_model.users:
                 # The author should have writer permissions.
-                if collaborator.name == metadata.author:
+                if user.username == metadata.author:
                     await self.collaborator_store.add(
-                        request_model.metadata.id, collaborator, [Role(name="WRITER")]
+                        request_model.metadata.id, user, [Role(name="WRITER")]
                     )
                     continue
                 await self.collaborator_store.add(
-                    request_model.metadata.id, collaborator, request_model.roles
+                    request_model.metadata.id, user, request_model.roles
                 )
         if request_model.contents:
             await self.file_store.add(metadata.id, request_model.contents)
@@ -134,10 +120,12 @@ class BaseStorageManager(LoggingConfigurable):
 
     async def delete(self, file_id: str):
         # Need to remove collaborators for this file.
-        collaborator_roles = await self.collaborator_store.get(file_id=file_id)
+        collaborators = await self.collaborator_store.get(file_id=file_id)
         # NOTE: we should refactor this to delete as a batch, not one-by-one.
-        for cr in collaborator_roles:
-            await self.collaborator_store.delete(file_id, Collaborator(name=cr.name))
+        for cr in collaborators:
+            await self.collaborator_store.delete(
+                file_id, User(authority=cr.authority, username=cr.username)
+            )
         # Delete file and metadata
         await self.file_store.delete(file_id)
         await self.metadata_store.delete(file_id)
@@ -146,21 +134,17 @@ class BaseStorageManager(LoggingConfigurable):
         self, file_id: str, request_model: SharedFileRequestModel
     ) -> SharedFileResponseModel:
         metadata = await self.metadata_store.update(request_model.metadata)
-        if request_model.collaborators:
-            await self.collaborator_store.update(
-                file_id, request_model.collaborators, request_model.roles
-            )
+        if request_model.users:
+            for user in request_model.users:
+                await self.collaborator_store.update(file_id, user, request_model.roles)
         if request_model.contents:
             await self.file_store.add(file_id, request_model.contents)
         return SharedFileResponseModel(metadata=metadata)
 
-    async def list(self, user_id: str) -> List[SharedFileResponseModel]:
-        file_ids = await self.collaborator_store.list(user_id)
+    async def list(self, user: User) -> List[SharedFileResponseModel]:
+        file_ids = await self.collaborator_store.list(user)
         metadatas = await self.metadata_store.list(file_ids)
         return [SharedFileResponseModel(metadata=m) for m in metadatas]
-
-    async def search_users(self, substring: Optional[str]) -> List[Collaborator]:
-        return await self.user_store.search_users(substring)
 
 
 StorageManagerABC.register(BaseStorageManager)

@@ -1,0 +1,93 @@
+# Zero-to-JupyterHub (z2jh) values for the publishing-service demo on kind.
+#
+# This deploys ONLY the Hub, using the z2jh `k8s-hub` image (we do not
+# install this package into it). The publishing service is a SEPARATE
+# Deployment — see publishing-service.yaml.
+#
+# See README.md ("Kubernetes with kind") for the full walkthrough.
+
+# kind has no cloud LoadBalancer; reach the proxy via `kubectl port-forward`.
+proxy:
+  service:
+    type: ClusterIP
+
+hub:
+  # quay.io/jupyterhub/k8s-hub:4.4.0 was hitting ErrImagePull from kind's
+  # nodes; pulled it locally and pushed it to the kind-local registry instead.
+  image:
+    name: kind-registry.test:5000/jupyterhub/k8s-hub
+    tag: "4.4.0"
+    pullPolicy: IfNotPresent
+
+  config:
+    JupyterHub:
+      authenticator_class: dummy # local testing only
+    Authenticator:
+      allow_all: true
+
+  # Inject the shared secrets (created via kubectl, see README) as env so the
+  # extraConfig block below can register the external service and mint the
+  # demo user tokens without hardcoding secrets in this file.
+  extraEnv:
+    PUBLISH_SERVICE_API_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: publishing-shared-token
+          key: service-token
+    ALICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: publishing-shared-token
+          key: alice-token
+    BOB_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: publishing-shared-token
+          key: bob-token
+
+  extraConfig:
+    # Everything the publishing service needs from the Hub. Mirrors
+    # examples/jupyterhub/hub_config.py, minus the DummyAuthenticator (set
+    # above via hub.config). custom_scopes has no dedicated z2jh key, and the
+    # external service token must be read from env, so both live here.
+    00-publishing.py: |
+      import os
+
+      SCOPE = "custom:publishing"  # == jupyter_publishing_service.constants.JUPYTERHUB_SCOPE
+
+      c.JupyterHub.custom_scopes = {
+          SCOPE: {"description": "Access the Jupyter publishing service."},
+      }
+
+      # External service: the Hub neither spawns nor proxies the publishing
+      # service, it only shares this token.
+      c.JupyterHub.services = [
+          {"name": "publish", "api_token": os.environ["PUBLISH_SERVICE_API_TOKEN"]},
+      ]
+
+      c.JupyterHub.load_roles = [
+          # The publishing service can enumerate users (HubUserStore autocomplete).
+          {
+              "name": "publish-service-role",
+              "description": "Lets the publishing service enumerate hub users.",
+              "scopes": ["list:users", "read:users"],
+              "services": ["publish"],
+          },
+          # Holds the custom publishing scope. A DEDICATED role assigned to the
+          # demo users — do NOT instead override the default `user` role: that
+          # drops the built-in user permissions and /hub/api/user comes back
+          # with empty scopes, which trips the publishing service's scope check
+          # (403 "Caller missing required scope(s): ['custom:publishing']").
+          {
+              "name": "publishing-user",
+              "description": "Holds the custom publishing scope.",
+              "scopes": [SCOPE],
+              "users": ["alice", "bob"],
+          },
+      ]
+
+      # Pre-mint API tokens for the two demo users so demo.py can run headless.
+      c.JupyterHub.api_tokens = {
+          os.environ["ALICE_TOKEN"]: "alice",
+          os.environ["BOB_TOKEN"]: "bob",
+      }

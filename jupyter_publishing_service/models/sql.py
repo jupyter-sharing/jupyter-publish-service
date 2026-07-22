@@ -5,13 +5,28 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import field_serializer
-from sqlalchemy import JSON, Column, UniqueConstraint
+from sqlalchemy import JSON, Column, ForeignKeyConstraint, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
-class Collaborator(SQLModel, table=True):
-    name: str = Field(primary_key=True)
-    # display_name: Optional[str]
+# Taken from jupyter_server.auth.identity, with the addition of `authority`
+# so we can tell the same `username` apart across distinct Jupyter
+# deployments (a JupyterLab install, a JupyterLite, a JupyterHub).
+# `authority` is an operator-supplied string registered with the publishing
+# service for each deployment; it is opaque to publish-service and immutable
+# once set.
+class User(SQLModel, table=True):
+    authority: str = Field(primary_key=True)
+    username: str = Field(primary_key=True)
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    initials: Optional[str] = None
+    avatar_url: Optional[str] = None
+    color: Optional[str] = None
+
+    @property
+    def qualified_name(self) -> str:
+        return f"{self.username}@{self.authority}"
 
 
 class PermissionRoleLink(SQLModel, table=True):
@@ -34,12 +49,18 @@ class Permission(SQLModel, table=True):
     roles: List["Role"] = Relationship(back_populates="permissions", link_model=PermissionRoleLink)
 
 
-class CollaboratorRole(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    name: str = Field(foreign_key="collaborator.name", index=True)
-    file: str = Field(foreign_key="sharedfilemetadata.id", index=True)
+class Collaborator(SQLModel, table=True):
+    authority: str = Field(primary_key=True)
+    username: str = Field(primary_key=True)
+    file: str = Field(foreign_key="sharedfilemetadata.id", index=True, primary_key=True)
     role: str = Field(foreign_key="role.name")
-    __table_args__ = (UniqueConstraint("name", "file", "role", name="unique_cfr"),)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["authority", "username"],
+            ["user.authority", "user.username"],
+        ),
+        UniqueConstraint("authority", "username", "file", "role", name="unique_cfr"),
+    )
 
 
 class JupyterContentsModel(SQLModel, table=True):

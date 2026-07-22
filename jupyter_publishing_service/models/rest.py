@@ -5,13 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from .sql import (
-    Collaborator,
-    CollaboratorRole,
-    JupyterContentsModel,
-    Role,
-    SharedFileMetadata,
-)
+from .sql import JupyterContentsModel, Role, SharedFileMetadata, User
 
 
 class ServiceStatusResponse(BaseModel):
@@ -23,12 +17,15 @@ class SharedFileRequestModel(BaseModel):
     """
     NOTE: There is a slight difference between the
     request model and the response model.
-    The collaborators and roles models are separated
-    in the request model for convenience.
+
+    The request model is mean to associate
+    users with roles.
+
+    A user->role relationship is a 'collaborator'.
     """
 
     metadata: SharedFileMetadata
-    collaborators: Optional[List[Collaborator]] = None
+    users: Optional[List[User]] = None
     roles: Optional[List[Role]] = None
     contents: Optional[JupyterContentsModel] = None
 
@@ -42,5 +39,5 @@ class SharedFileResponseModel(BaseModel):
     """
 
     metadata: SharedFileMetadata
-    collaborator_roles: Optional[List[CollaboratorRole]] = None
+    collaborator: Optional[List[User]] = None
     contents: Optional[JupyterContentsModel] = None

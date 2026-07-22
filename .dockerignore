@@ -1,0 +1,21 @@
+# Keep the Docker build context small and reproducible. The publishing-service
+# image (examples/jupyterhub/Dockerfile) builds from the repo root.
+.git
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.venv
+venv
+
+# Local demo state that must never bake into an image.
+**/*.sqlite
+**/database.db
+**/jupyterhub_cookie_secret
+**/jupyterhub-proxy.pid
+
+# Large sibling trees not needed to install the package.
+experimental/
+docs/
+jupyter_ydoc/
+node_modules/
